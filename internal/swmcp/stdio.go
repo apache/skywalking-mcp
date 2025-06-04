@@ -24,6 +24,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -31,7 +32,6 @@ import (
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -57,31 +57,26 @@ func NewStdioServer() *cobra.Command {
 				LogCommands: viper.GetBool("log-command"),
 			}
 
-			return runStdioServer(context.Background(), stdioServerConfig)
+			return runStdioServer(context.Background(), &stdioServerConfig)
 		},
 	}
 }
 
 // runStdioServer starts a standard input/output server for the MCP protocol.
-func runStdioServer(ctx context.Context, cfg config.StdioServerConfig) error {
+func runStdioServer(ctx context.Context, cfg *config.StdioServerConfig) error {
 	slog.Info("Start a server that communicates via standard input/output streams using JSON-RPC messages.")
 	// Handle SIGINT and SIGTERM
-	_, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	stdioServer := server.NewStdioServer(newMcpServer())
 
-	logrusLogger := logrus.New()
-	if cfg.LogFilePath != "" {
-		file, err := os.OpenFile(cfg.LogFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
-		if err != nil {
-			return fmt.Errorf("failed to open log file: %w", err)
-		}
-
-		logrusLogger.SetLevel(logrus.DebugLevel)
-		logrusLogger.SetOutput(file)
+	logger, err := initLogger(cfg.LogFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
-	stdLogger := log.New(logrusLogger.Writer(), "swmcp-stdioserver", 0)
+
+	stdLogger := log.New(logger.Writer(), "swmcp-stdio-server", 0)
 	stdioServer.SetErrorLogger(stdLogger)
 	stdioServer.SetContextFunc(EnhanceStdioContextFunc())
 
@@ -91,7 +86,7 @@ func runStdioServer(ctx context.Context, cfg config.StdioServerConfig) error {
 		in, out := io.Reader(os.Stdin), io.Writer(os.Stdout)
 
 		if cfg.LogCommands {
-			loggedIO := tools.NewIOLogger(in, out, logrusLogger)
+			loggedIO := tools.NewIOLogger(in, out, logger)
 			in, out = loggedIO, loggedIO
 		}
 
@@ -99,12 +94,12 @@ func runStdioServer(ctx context.Context, cfg config.StdioServerConfig) error {
 	}()
 
 	// Output github-mcp-server string
-	_, _ = fmt.Fprintf(os.Stderr, "GitHub MCP Server running on stdio\n")
+	_, _ = fmt.Fprintf(os.Stderr, "SkyWalking MCP Server running on stdio\n")
 
 	// Wait for shutdown signal
 	select {
 	case <-ctx.Done():
-		logrusLogger.Infof("shutting down server...")
+		logger.Infof("shutting down server...")
 	case err := <-errC:
 		if err != nil {
 			return fmt.Errorf("error running server: %w", err)
@@ -114,16 +109,33 @@ func runStdioServer(ctx context.Context, cfg config.StdioServerConfig) error {
 	return nil
 }
 
-var ExtractSWInfoFromCfg server.StdioContextFunc = func(ctx context.Context) context.Context {
+var ExtractSWURLFromCfg server.StdioContextFunc = func(ctx context.Context) context.Context {
 	urlStr := viper.GetString("url")
 	if urlStr == "" {
 		urlStr = config.DefaultSWURL
 	}
 
+	// we need to ensure the URL ends with "/graphql"
 	if !strings.HasSuffix(urlStr, "/graphql") {
 		urlStr = strings.TrimRight(urlStr, "/") + "/graphql"
 	}
-	return WithSkyWalkingURL(ctx, urlStr)
+	return WithSkyWalkingURLAndInsecure(ctx, urlStr)
+}
+
+var ExtractSWURLFromHeaders server.SSEContextFunc = func(ctx context.Context, req *http.Request) context.Context {
+	urlStr := req.Header.Get("SW-URL")
+	if urlStr == "" {
+		urlStr = viper.GetString("url")
+		if urlStr == "" {
+			urlStr = config.DefaultSWURL
+		}
+	}
+
+	// we need to ensure the URL ends with "/graphql"
+	if !strings.HasSuffix(urlStr, "/graphql") {
+		urlStr = strings.TrimRight(urlStr, "/") + "/graphql"
+	}
+	return WithSkyWalkingURLAndInsecure(ctx, urlStr)
 }
 
 func EnhanceStdioContextFuncs(funcs ...server.StdioContextFunc) server.StdioContextFunc {
@@ -135,11 +147,28 @@ func EnhanceStdioContextFuncs(funcs ...server.StdioContextFunc) server.StdioCont
 	}
 }
 
-// WithSkyWalkingURL adds the SkyWalking URL to the context.
-func WithSkyWalkingURL(ctx context.Context, url string) context.Context {
-	return context.WithValue(ctx, contextkey.BaseURL{}, url)
+func EnhanceSSEContextFuncs(funcs ...server.SSEContextFunc) server.SSEContextFunc {
+	return func(ctx context.Context, r *http.Request) context.Context {
+		for _, f := range funcs {
+			ctx = f(ctx, r)
+		}
+		return ctx
+	}
 }
 
+// WithSkyWalkingURLAndInsecure adds the SkyWalking URL and Insecure to the context.
+func WithSkyWalkingURLAndInsecure(ctx context.Context, url string) context.Context {
+	ctx = context.WithValue(ctx, contextkey.BaseURL{}, url)
+	ctx = context.WithValue(ctx, contextkey.Insecure{}, false)
+	return ctx
+}
+
+// EnhanceStdioContextFunc returns a StdioContextFunc that composes all the provided StdioContextFuncs.
 func EnhanceStdioContextFunc() server.StdioContextFunc {
-	return EnhanceStdioContextFuncs(ExtractSWInfoFromCfg)
+	return EnhanceStdioContextFuncs(ExtractSWURLFromCfg)
+}
+
+// EnhanceHTTPContextFunc returns a SSEContextFunc that composes all the provided HTTPContextFuncs.
+func EnhanceHTTPContextFunc() server.SSEContextFunc {
+	return EnhanceSSEContextFuncs(ExtractSWURLFromHeaders)
 }

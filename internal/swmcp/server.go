@@ -18,11 +18,17 @@
 package swmcp
 
 import (
-	"github.com/apache/skywalking-mcp/internal/tools"
+	"fmt"
+	"os"
 
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/sirupsen/logrus"
+
+	"github.com/apache/skywalking-mcp/internal/tools"
 )
 
+// newMcpServer creates a new MCP server instance,
+// and we can add various tools and capabilities to it.
 func newMcpServer() *server.MCPServer {
 	mcpServer := server.NewMCPServer(
 		"skywalking-mcp",
@@ -33,4 +39,22 @@ func newMcpServer() *server.MCPServer {
 	tools.AddTraceTools(mcpServer)
 
 	return mcpServer
+}
+
+func initLogger(logFilePath string) (*logrus.Logger, error) {
+	if logFilePath == "" {
+		return logrus.New(), nil
+	}
+
+	file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	logrusLogger := logrus.New()
+	logrusLogger.SetFormatter(&logrus.TextFormatter{})
+	logrusLogger.SetLevel(logrus.DebugLevel)
+	logrusLogger.SetOutput(file)
+
+	return logrusLogger, nil
 }

@@ -16,7 +16,7 @@
 #
 
 VERSION_PATH=main
-GIT_VERSION=$(shell git describe --tags --abbrev=0)-SNAPSHOT-$(shell git rev-parse --short HEAD)
+VERSION ?= dev-$(shell git rev-parse --short HEAD)
 GIT_COMMIT=$(shell git rev-parse HEAD)
 BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 MKDIR_P = mkdir -p
@@ -24,17 +24,24 @@ MKDIR_P = mkdir -p
 GO_LINT = golangci-lint
 LICENSE_EYE = license-eye
 
+HUB ?= docker.io/apache
+APP_NAME = skywalking-mcp
+
 .PHONY: all
 all: build ;
 
 .PHONY: build
-build:
+build: ## Build the binary.
 	${MKDIR_P} bin/
 	CGO_ENABLED=0 go build -ldflags "\
-		-X ${VERSION_PATH}.version=${GIT_VERSION} \
+	    -X ${VERSION_PATH}.version=${VERSION} \
 		-X ${VERSION_PATH}.commit=${GIT_COMMIT} \
 		-X ${VERSION_PATH}.date=${BUILD_DATE}" \
 		-o bin/swmcp cmd/skywalking-mcp/main.go
+
+.PHONY: build-image
+build-image: ## Build the Docker image.
+	docker build -t skywalking-mcp:latest .
 
 $(GO_LINT):
 	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0
@@ -84,3 +91,16 @@ clean:
 	-rm -rf *.asc
 	-rm -rf *.sha512
 	@go mod tidy &> /dev/null
+
+.PHONY: docker
+docker: PUSH_OR_LOAD = --load
+docker: PLATFORMS =
+
+.PHONY: docker.push
+docker.push: PUSH_OR_LOAD = --push
+docker.push: PLATFORMS = --platform linux/386,linux/amd64,linux/arm64
+
+docker docker.push:
+	docker buildx create --use --driver docker-container --name skywalking_mcp > /dev/null 2>&1 || true
+	docker buildx build $(PUSH_OR_LOAD) $(PLATFORMS) --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
+	docker buildx rm skywalking_mcp

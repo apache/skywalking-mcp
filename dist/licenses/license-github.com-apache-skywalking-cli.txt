@@ -173,72 +173,38 @@
       incurred by, or claims asserted against, such Contributor by reason
       of your accepting any such warranty or additional liability.
 
-========================================================================
-Apache-2.0 licenses
-========================================================================
+   END OF TERMS AND CONDITIONS
 
-The following components are provided under the Apache-2.0 License. See project link for details.
-The text of each license is also included at licenses/license-[project].txt.
+   APPENDIX: How to apply the Apache License to your work.
 
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
 
-    github.com/apache/skywalking-cli v0.0.0-20250604010708-77b4c49e89c9 Apache-2.0
-    github.com/inconshreveable/mousetrap v1.1.0 Apache-2.0
-    github.com/machinebox/graphql v0.2.2 Apache-2.0
-    github.com/spf13/afero v1.14.0 Apache-2.0
-    github.com/spf13/cobra v1.9.1 Apache-2.0
-    skywalking.apache.org/repo/goapi v0.0.0-20250520033135-e237d585745f Apache-2.0
+   Copyright {yyyy} {name of copyright owner}
 
-========================================================================
-BSD-2-Clause licenses
-========================================================================
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-The following components are provided under the BSD-2-Clause License. See project link for details.
-The text of each license is also included at licenses/license-[project].txt.
+       http://www.apache.org/licenses/LICENSE-2.0
 
-
-    github.com/pkg/errors v0.9.1 BSD-2-Clause
-
-========================================================================
-BSD-3-Clause licenses
-========================================================================
-
-The following components are provided under the BSD-3-Clause License. See project link for details.
-The text of each license is also included at licenses/license-[project].txt.
-
-
-    github.com/fsnotify/fsnotify v1.9.0 BSD-3-Clause
-    github.com/google/uuid v1.6.0 BSD-3-Clause
-    github.com/spf13/pflag v1.0.6 BSD-3-Clause
-    github.com/yosida95/uritemplate/v3 v3.0.2 BSD-3-Clause
-    golang.org/x/sys v0.33.0 BSD-3-Clause
-    golang.org/x/text v0.25.0 BSD-3-Clause
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 
 ========================================================================
-MIT licenses
+Apache 2.0 licenses
 ========================================================================
 
-The following components are provided under the MIT License. See project link for details.
-The text of each license is also included at licenses/license-[project].txt.
+The following components are provided under the Apache License. See project link for details.
+The text of each license is the standard Apache 2.0 license.
 
-
-    github.com/go-viper/mapstructure/v2 v2.2.1 MIT
-    github.com/mark3labs/mcp-go v0.31.0 MIT
-    github.com/pelletier/go-toml/v2 v2.2.4 MIT
-    github.com/sagikazarmark/locafero v0.9.0 MIT
-    github.com/sirupsen/logrus v1.9.3 MIT
-    github.com/sourcegraph/conc v0.3.0 MIT
-    github.com/spf13/cast v1.9.1 MIT
-    github.com/spf13/viper v1.20.1 MIT
-    github.com/subosito/gotenv v1.6.0 MIT
-    go.uber.org/multierr v1.11.0 MIT
-
-========================================================================
-MIT and Apache-2.0 licenses
-========================================================================
-
-The following components are provided under the MIT and Apache-2.0 License. See project link for details.
-The text of each license is also included at licenses/license-[project].txt.
-
-
-    gopkg.in/yaml.v3 v3.0.1 MIT and Apache-2.0
-
+    pkg/display/graph/flamegraph files from jvm-profiling-tools/async-profiler: https://github.com/jvm-profiling-tools/async-profiler Apache-2.0

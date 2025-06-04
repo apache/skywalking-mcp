@@ -47,3 +47,24 @@ type StdioServerConfig struct {
 	// LogCommands indicates if we should log commands
 	LogCommands bool
 }
+
+// SSEServerConfig holds the configuration for Stdio.
+type SSEServerConfig struct {
+	// SkyWalking OAP URL to target for API requests (e.g. localhost:12800)
+	URL string
+
+	// ReadOnly indicates if we should only offer read-only tools
+	ReadOnly bool
+
+	// Path to the log file if not stderr
+	LogFilePath string
+
+	// LogCommands indicates if we should log commands
+	LogCommands bool
+
+	// The host and port to start the sse server on
+	Address string
+
+	// Base path for the sse server
+	BasePath string
+}

@@ -1,5 +1,5 @@
-github.com/apache/skywalking-cli v0.0.0-20250520051046-7bbac156e74e h1:JRsFyYSDXtI1wCy1POoXSw4jpIhLFHp9Lqp+xFz7+6g=
-github.com/apache/skywalking-cli v0.0.0-20250520051046-7bbac156e74e/go.mod h1:5S2bH5p65WLXmFufyX5JM1btkx6ail8wqdSkjy0hb3I=
+github.com/apache/skywalking-cli v0.0.0-20250604010708-77b4c49e89c9 h1:loGzKlrRMY5r4qoCFA+cWSEvCP4hj1dnf+BzrGSDKQE=
+github.com/apache/skywalking-cli v0.0.0-20250604010708-77b4c49e89c9/go.mod h1:5S2bH5p65WLXmFufyX5JM1btkx6ail8wqdSkjy0hb3I=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

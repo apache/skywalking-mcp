@@ -18,10 +18,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -35,7 +38,7 @@ var (
 	date    = "date"
 
 	rootCmd = &cobra.Command{
-		Use:     "server",
+		Use:     "swmcp",
 		Short:   "Apache SkyWalking MCP Server.",
 		Long:    `This is a server that implements the MCP protocol for Apache SkyWalking.`,
 		Version: fmt.Sprintf("Version: %s\nCommit: %s\nBuild Date: %s", version, commit, date),
@@ -54,7 +57,6 @@ func init() {
 
 	// Add global Flags
 	rootCmd.PersistentFlags().String("sw-url", "", "Specify the OAP URL to connect to (e.g. http://localhost:12800)")
-	rootCmd.PersistentFlags().String("sse-addr", "localhost:8000", "Which address to listen on for SSE transport")
 	rootCmd.PersistentFlags().String("log-level", "info", "Logging level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().Bool("read-only", false, "Restrict the server to read-only operations")
 	rootCmd.PersistentFlags().Bool("log-command", false, "When true, log commands to the log file")
@@ -62,7 +64,6 @@ func init() {
 
 	// Bind flag to viper
 	_ = viper.BindPFlag("url", rootCmd.PersistentFlags().Lookup("sw-url"))
-	_ = viper.BindPFlag("sse-addr", rootCmd.PersistentFlags().Lookup("sse-addr"))
 	_ = viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
 	_ = viper.BindPFlag("read-only", rootCmd.PersistentFlags().Lookup("read-only"))
 	_ = viper.BindPFlag("log-command", rootCmd.PersistentFlags().Lookup("log-command"))
@@ -71,6 +72,9 @@ func init() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: parseLogLevel(viper.GetString("log-level")),
 	})))
+
+	_, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// Add subcommands
 	rootCmd.AddCommand(swmcp.NewStdioServer())
