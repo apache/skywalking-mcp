@@ -29,9 +29,9 @@ github:
     squash: true
     merge: false
     rebase: false
-  dependabot_updates: false
+  dependabot_updates: true
   protected_branches:
-    master:
+    main:
       required_status_checks:
         strict: true
         contexts:

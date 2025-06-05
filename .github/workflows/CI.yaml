@@ -22,9 +22,7 @@ on:
   pull_request:
   push:
     branches:
-      - master
-  schedule:
-    - cron: "0 18 * * *" # TimeZone: UTC 0
+      - main
 
 concurrency:
   group: skywalking-mcp-${{ github.event.pull_request.number || github.ref }}
@@ -49,7 +47,11 @@ jobs:
           go-version: "1.24"
 
       - name: Check Dependencies License
-        run: make dependency-license
+        uses: apache/skywalking-eyes/dependency@69f34abb75ec4e414b593ac3f34228b60e33f97b
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          flags: -w
 
   build:
     name: Build
