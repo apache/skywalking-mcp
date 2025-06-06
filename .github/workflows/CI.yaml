@@ -1,0 +1,88 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: skywalking-mcp-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-license:
+    name: License header
+    if: github.repository == 'apache/skywalking-mcp'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check License Header
+        uses: apache/skywalking-eyes@5dfa68f93380a5e57259faaf95088b7f133b5778
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Check Dependencies License
+        uses: apache/skywalking-eyes/dependency@69f34abb75ec4e414b593ac3f34228b60e33f97b
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          flags: -w
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    if: github.repository == 'apache/skywalking-mcp'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.24
+
+      - name: Lint
+        run: make lint
+
+      - name: Build Docker images
+        run: make docker
+
+  required:
+    if: always()
+    name: Required
+    needs:
+      - check-license
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Merge Requirement
+        run: |
+          checkLicense=${{ needs.check-license.result }}
+          [[ ${checkLicense} == 'success' ]] || exit 1;
+          build=${{ needs.build.result }};
+          [[ ${build} == 'success' ]] || [[ ${build} == 'skipped' ]] || exit 3;
+          exit 0;
