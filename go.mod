@@ -4,7 +4,7 @@ go 1.24.3
 
 require (
 	github.com/apache/skywalking-cli v0.0.0-20250604010708-77b4c49e89c9
-	github.com/mark3labs/mcp-go v0.31.0
+	github.com/mark3labs/mcp-go v0.32.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
