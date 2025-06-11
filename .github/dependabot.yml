@@ -26,3 +26,5 @@ updates:
       actions-deps:
         patterns:
           - "*"
+        exclude-patterns:
+          - "github.com/apache/skywalking-cli"
