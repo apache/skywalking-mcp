@@ -29,13 +29,13 @@ import (
 type Tool[T any, R any] struct {
 	Name        string
 	Description string
-	Handler     func(ctx context.Context, args T) (R, error)
+	Handler     func(ctx context.Context, args *T) (R, error)
 	Options     []mcp.ToolOption
 }
 
 func NewTool[T any, R any](
 	name, desc string,
-	handler func(ctx context.Context, args T) (R, error),
+	handler func(ctx context.Context, args *T) (R, error),
 	options ...mcp.ToolOption,
 ) *Tool[T, R] {
 	return &Tool[T, R]{
@@ -59,7 +59,7 @@ func (t *Tool[T, R]) Register(server *server.MCPServer) {
 func ConvertTool[T any, R any](
 	name string,
 	desc string,
-	handlerFunc func(ctx context.Context, args T) (R, error),
+	handlerFunc func(ctx context.Context, args *T) (R, error),
 	options ...mcp.ToolOption,
 ) (mcp.Tool, server.ToolHandlerFunc, error) {
 	baseOptions := []mcp.ToolOption{
@@ -77,7 +77,7 @@ func ConvertTool[T any, R any](
 			return nil, fmt.Errorf("failed to bind arguments: %w", err)
 		}
 
-		result, err := handlerFunc(ctx, args)
+		result, err := handlerFunc(ctx, &args)
 		if err != nil {
 			return nil, err
 		}

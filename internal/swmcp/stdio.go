@@ -24,13 +24,10 @@ import (
 	"io"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
-	"github.com/apache/skywalking-cli/pkg/contextkey"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -93,7 +90,6 @@ func runStdioServer(ctx context.Context, cfg *config.StdioServerConfig) error {
 		errC <- stdioServer.Listen(ctx, in, out)
 	}()
 
-	// Output github-mcp-server string
 	_, _ = fmt.Fprintf(os.Stderr, "SkyWalking MCP Server running on stdio\n")
 
 	// Wait for shutdown signal
@@ -107,68 +103,4 @@ func runStdioServer(ctx context.Context, cfg *config.StdioServerConfig) error {
 	}
 
 	return nil
-}
-
-var ExtractSWURLFromCfg server.StdioContextFunc = func(ctx context.Context) context.Context {
-	urlStr := viper.GetString("url")
-	if urlStr == "" {
-		urlStr = config.DefaultSWURL
-	}
-
-	// we need to ensure the URL ends with "/graphql"
-	if !strings.HasSuffix(urlStr, "/graphql") {
-		urlStr = strings.TrimRight(urlStr, "/") + "/graphql"
-	}
-	return WithSkyWalkingURLAndInsecure(ctx, urlStr)
-}
-
-var ExtractSWURLFromHeaders server.SSEContextFunc = func(ctx context.Context, req *http.Request) context.Context {
-	urlStr := req.Header.Get("SW-URL")
-	if urlStr == "" {
-		urlStr = viper.GetString("url")
-		if urlStr == "" {
-			urlStr = config.DefaultSWURL
-		}
-	}
-
-	// we need to ensure the URL ends with "/graphql"
-	if !strings.HasSuffix(urlStr, "/graphql") {
-		urlStr = strings.TrimRight(urlStr, "/") + "/graphql"
-	}
-	return WithSkyWalkingURLAndInsecure(ctx, urlStr)
-}
-
-func EnhanceStdioContextFuncs(funcs ...server.StdioContextFunc) server.StdioContextFunc {
-	return func(ctx context.Context) context.Context {
-		for _, f := range funcs {
-			ctx = f(ctx)
-		}
-		return ctx
-	}
-}
-
-func EnhanceSSEContextFuncs(funcs ...server.SSEContextFunc) server.SSEContextFunc {
-	return func(ctx context.Context, r *http.Request) context.Context {
-		for _, f := range funcs {
-			ctx = f(ctx, r)
-		}
-		return ctx
-	}
-}
-
-// WithSkyWalkingURLAndInsecure adds the SkyWalking URL and Insecure to the context.
-func WithSkyWalkingURLAndInsecure(ctx context.Context, url string) context.Context {
-	ctx = context.WithValue(ctx, contextkey.BaseURL{}, url)
-	ctx = context.WithValue(ctx, contextkey.Insecure{}, false)
-	return ctx
-}
-
-// EnhanceStdioContextFunc returns a StdioContextFunc that composes all the provided StdioContextFuncs.
-func EnhanceStdioContextFunc() server.StdioContextFunc {
-	return EnhanceStdioContextFuncs(ExtractSWURLFromCfg)
-}
-
-// EnhanceHTTPContextFunc returns a SSEContextFunc that composes all the provided HTTPContextFuncs.
-func EnhanceHTTPContextFunc() server.SSEContextFunc {
-	return EnhanceSSEContextFuncs(ExtractSWURLFromHeaders)
 }

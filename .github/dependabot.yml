@@ -22,9 +22,9 @@ updates:
       interval: "daily"
     assignees:
       - "CodePrometheus"
+    ignore:
+      - dependency-name: "github.com/apache/skywalking-cli"
     groups:
       actions-deps:
         patterns:
           - "*"
-        exclude-patterns:
-          - "github.com/apache/skywalking-cli"

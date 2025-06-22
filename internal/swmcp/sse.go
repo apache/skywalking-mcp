@@ -74,7 +74,7 @@ func runSSEServer(ctx context.Context, cfg *config.SSEServerConfig) error {
 	sseServer := server.NewSSEServer(
 		newMcpServer(),
 		server.WithStaticBasePath(cfg.BasePath),
-		server.WithSSEContextFunc(EnhanceHTTPContextFunc()),
+		server.WithSSEContextFunc(EnhanceSSEContextFunc()),
 	)
 	ssePath := sseServer.CompleteSsePath()
 	log.Printf("Starting SkyWalking MCP server using SSE transport listening on http://%s%s\n ", cfg.Address, ssePath)

@@ -79,6 +79,7 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(swmcp.NewStdioServer())
 	rootCmd.AddCommand(swmcp.NewSSEServer())
+	rootCmd.AddCommand(swmcp.NewStreamable())
 }
 
 func main() {
