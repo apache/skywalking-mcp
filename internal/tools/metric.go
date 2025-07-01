@@ -278,60 +278,61 @@ func queryTopNMetrics(ctx context.Context, req *TopNMetricsRequest) (*mcp.CallTo
 // SingleMetricsTool is a tool for querying single-value metrics
 var SingleMetricsTool = NewTool[SingleMetricsRequest, *mcp.CallToolResult](
 	"query_single_metrics",
-	"This tool queries single-value metrics defined in backend OAL from SkyWalking OAP.\n\n"+
-		"Workflow:\n"+
-		"1. Use this tool when you need to get a single metric value for a specific entity\n"+
-		"2. Specify the metrics name and entity details (service, endpoint, etc.)\n"+
-		"3. Set the time range for the query\n"+
-		"4. Get the metric value as a single integer result\n\n"+
-		"Metrics Examples:\n"+
-		"- service_cpm: Calls per minute for a service\n"+
-		"- endpoint_cpm: Calls per minute for an endpoint\n"+
-		"- service_resp_time: Response time for a service\n"+
-		"- service_apdex: Apdex score for a service\n"+
-		"- service_sla: SLA percentage for a service\n\n"+
-		"Entity Scopes:\n"+
-		"- Service: Service-level metrics\n"+
-		"- ServiceInstance: Service instance-level metrics\n"+
-		"- Endpoint: Endpoint-level metrics\n"+
-		"- Process: Process-level metrics\n"+
-		"- ServiceRelation: Service relationship metrics\n"+
-		"- ServiceInstanceRelation: Service instance relationship metrics\n"+
-		"- EndpointRelation: Endpoint relationship metrics\n"+
-		"- ProcessRelation: Process relationship metrics\n\n"+
-		"Time Format:\n"+
-		"- Absolute time: \"2023-01-01 12:00:00\", \"2023-01-01 12\"\n"+
-		"- Relative time: \"-30m\" (30 minutes ago), \"-1h\" (1 hour ago)\n"+
-		"- Step: \"SECOND\", \"MINUTE\", \"HOUR\", \"DAY\"\n\n"+
-		"Examples:\n"+
-		"- {\"metrics_name\": \"service_cpm\", \"service_name\": \"business-zone::projectC\", \"duration\": \"1h\"}: "+
-		"Get calls per minute for a service in the last hour\n"+
-		"- {\"metrics_name\": \"endpoint_cpm\", \"service_name\": \"business-zone::projectC\", "+
-		"\"endpoint_name\": \"/projectC/{value}\", \"duration\": \"30m\"}: "+
-		"Get calls per minute for a specific endpoint in the last 30 minutes\n"+
-		"- {\"metrics_name\": \"service_resp_time\", \"service_name\": \"web-service\", \"start\": \"-1h\", \"end\": \"now\", \"step\": \"MINUTE\"}: "+
-		"Get service response time with custom time range\n"+
-		"- {\"metrics_name\": \"service_apdex\", \"service_name\": \"api-gateway\", \"cold\": true}: "+
-		"Get Apdex score from cold storage",
+	`This tool queries single-value metrics defined in backend OAL from SkyWalking OAP.
+
+Workflow:
+1. Use this tool when you need to get a single metric value for a specific entity
+2. Specify the metrics name and entity details (service, endpoint, etc.)
+3. Set the time range for the query
+4. Get the metric value as a single integer result
+
+Metrics Examples:
+- service_cpm: Calls per minute for a service
+- endpoint_cpm: Calls per minute for an endpoint
+- service_resp_time: Response time for a service
+- service_apdex: Apdex score for a service
+- service_sla: SLA percentage for a service
+
+Entity Scopes:
+- Service: Service-level metrics
+- ServiceInstance: Service instance-level metrics
+- Endpoint: Endpoint-level metrics
+- Process: Process-level metrics
+- ServiceRelation: Service relationship metrics
+- ServiceInstanceRelation: Service instance relationship metrics
+- EndpointRelation: Endpoint relationship metrics
+- ProcessRelation: Process relationship metrics
+
+Time Format:
+- Absolute time: "2023-01-01 12:00:00", "2023-01-01 12"
+- Relative time: "-30m" (30 minutes ago), "-1h" (1 hour ago)
+- Step: "SECOND", "MINUTE", "HOUR", "DAY"
+
+Examples:
+- {"metrics_name": "service_cpm", "service_name": "business-zone::projectC", "duration": "1h"}: Get calls per minute for a service in the last hour
+- {"metrics_name": "endpoint_cpm", "service_name": "business-zone::projectC", 
+  "endpoint_name": "/projectC/{value}", "duration": "30m"}: Get calls per minute for a specific endpoint in the last 30 minutes
+- {"metrics_name": "service_resp_time", "service_name": "web-service", 
+  "start": "-1h", "end": "now", "step": "MINUTE"}: Get service response time with custom time range
+- {"metrics_name": "service_apdex", "service_name": "api-gateway", "cold": true}: Get Apdex score from cold storage`,
 	querySingleMetrics,
 	mcp.WithTitleAnnotation("Query single-value metrics"),
 	mcp.WithString("metrics_name", mcp.Required(),
-		mcp.Description("The name of the metrics to query. Examples: "+
-			"service_sla, endpoint_sla, service_instance_sla, service_cpm, "+
-			"service_resp_time, service_apdex"),
+		mcp.Description(`The name of the metrics to query. Examples: service_sla, endpoint_sla, 
+service_instance_sla, service_cpm, service_resp_time, service_apdex`),
 	),
 	mcp.WithString("scope",
 		mcp.Enum(string(api.ScopeAll), string(api.ScopeService), string(api.ScopeServiceInstance), string(api.ScopeEndpoint), string(api.ScopeProcess),
 			string(api.ScopeServiceRelation), string(api.ScopeServiceInstanceRelation), string(api.ScopeEndpointRelation), string(api.ScopeProcessRelation)),
-		mcp.Description("The scope of the metrics entity:\n"+
-			"- 'Service': Service-level metrics (default)\n"+
-			"- 'ServiceInstance': Service instance-level metrics\n"+
-			"- 'Endpoint': Endpoint-level metrics\n"+
-			"- 'Process': Process-level metrics\n"+
-			"- 'ServiceRelation': Service relationship metrics\n"+
-			"- 'ServiceInstanceRelation': Service instance relationship metrics\n"+
-			"- 'EndpointRelation': Endpoint relationship metrics\n"+
-			"- 'ProcessRelation': Process relationship metrics"),
+		mcp.Description(`The scope of the metrics entity:
+- 'Service': Service-level metrics (default)
+- 'ServiceInstance': Service instance-level metrics
+- 'Endpoint': Endpoint-level metrics
+- 'Process': Process-level metrics
+- 'ServiceRelation': Service relationship metrics
+- 'ServiceInstanceRelation': Service instance relationship metrics
+- 'EndpointRelation': Endpoint relationship metrics
+- 'ProcessRelation': Process relationship metrics`),
 	),
 	mcp.WithString("service_name",
 		mcp.Description("Service name to filter metrics. Use this to get metrics for a specific service."),
@@ -368,11 +369,11 @@ var SingleMetricsTool = NewTool[SingleMetricsRequest, *mcp.CallToolResult](
 	),
 	mcp.WithString("step",
 		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
-		mcp.Description("Time step between start time and end time:\n"+
-			"- 'SECOND': Second-level granularity\n"+
-			"- 'MINUTE': Minute-level granularity (default)\n"+
-			"- 'HOUR': Hour-level granularity\n"+
-			"- 'DAY': Day-level granularity"),
+		mcp.Description(`Time step between start time and end time:
+- 'SECOND': Second-level granularity
+- 'MINUTE': Minute-level granularity (default)
+- 'HOUR': Hour-level granularity
+- 'DAY': Day-level granularity`),
 	),
 	mcp.WithBoolean("cold",
 		mcp.Description("Whether to query from cold-stage storage. Set to true for historical data queries."),
@@ -382,63 +383,66 @@ var SingleMetricsTool = NewTool[SingleMetricsRequest, *mcp.CallToolResult](
 // TopNMetricsTool is a tool for querying top N metrics
 var TopNMetricsTool = NewTool[TopNMetricsRequest, *mcp.CallToolResult](
 	"query_top_n_metrics",
-	"This tool queries the top N entities sorted by the specified metrics from SkyWalking OAP.\n\n"+
-		"Workflow:\n"+
-		"1. Use this tool when you need to find the top N entities based on a specific metric\n"+
-		"2. Specify the metrics name and the number of top entities to retrieve\n"+
-		"3. Set the time range for the query\n"+
-		"4. Get a list of top N entities with their metric values\n\n"+
-		"Metrics Examples:\n"+
-		"- service_sla: SLA percentage for services\n"+
-		"- endpoint_sla: SLA percentage for endpoints\n"+
-		"- service_instance_sla: SLA percentage for service instances\n"+
-		"- service_cpm: Calls per minute for services\n"+
-		"- service_resp_time: Response time for services\n"+
-		"- service_apdex: Apdex score for services\n\n"+
-		"Entity Scopes:\n"+
-		"- Service: Service-level metrics (default)\n"+
-		"- ServiceInstance: Service instance-level metrics\n"+
-		"- Endpoint: Endpoint-level metrics\n"+
-		"- Process: Process-level metrics\n\n"+
-		"Order Options:\n"+
-		"- ASC: Ascending order (lowest values first)\n"+
-		"- DES: Descending order (highest values first, default)\n\n"+
-		"Time Format:\n"+
-		"- Absolute time: \"2023-01-01 12:00:00\", \"2023-01-01 12\"\n"+
-		"- Relative time: \"-30m\" (30 minutes ago), \"-1h\" (1 hour ago)\n"+
-		"- Step: \"SECOND\", \"MINUTE\", \"HOUR\", \"DAY\"\n\n"+
-		"Examples:\n"+
-		"- {\"metrics_name\": \"service_sla\", \"top_n\": 5, \"duration\": \"1h\"}: "+
-		"Get top 5 services with highest SLA in the last hour\n"+
-		"- {\"metrics_name\": \"endpoint_sla\", \"top_n\": 10, \"order\": \"ASC\", \"duration\": \"30m\"}: "+
-		"Get top 10 endpoints with lowest SLA in the last 30 minutes\n"+
-		"- {\"metrics_name\": \"service_instance_sla\", \"top_n\": 3, \"service_name\": \"boutique::adservice\", \"duration\": \"1h\"}: "+
-		"Get top 3 instances of a specific service with highest SLA\n"+
-		"- {\"metrics_name\": \"service_cpm\", \"top_n\": 5, \"start\": \"-1h\", \"end\": \"now\", \"step\": \"MINUTE\"}: "+
-		"Get top 5 services with highest calls per minute with custom time range",
+	`This tool queries the top N entities sorted by the specified metrics from SkyWalking OAP.
+
+Workflow:
+1. Use this tool when you need to find the top N entities based on a specific metric
+2. Specify the metrics name and the number of top entities to retrieve
+3. Set the time range for the query
+4. Get a list of top N entities with their metric values
+
+Metrics Examples:
+- service_sla: SLA percentage for services
+- endpoint_sla: SLA percentage for endpoints
+- service_instance_sla: SLA percentage for service instances
+- service_cpm: Calls per minute for services
+- service_resp_time: Response time for services
+- service_apdex: Apdex score for services
+
+Entity Scopes:
+- Service: Service-level metrics (default)
+- ServiceInstance: Service instance-level metrics
+- Endpoint: Endpoint-level metrics
+- Process: Process-level metrics
+
+Order Options:
+- ASC: Ascending order (lowest values first)
+- DES: Descending order (highest values first, default)
+
+Time Format:
+- Absolute time: "2023-01-01 12:00:00", "2023-01-01 12"
+- Relative time: "-30m" (30 minutes ago), "-1h" (1 hour ago)
+- Step: "SECOND", "MINUTE", "HOUR", "DAY"
+
+Examples:
+- {"metrics_name": "service_sla", "top_n": 5, "duration": "1h"}: Get top 5 services with highest SLA in the last hour
+- {"metrics_name": "endpoint_sla", "top_n": 10, "order": "ASC", "duration": "30m"}: Get top 10 endpoints with lowest SLA in the last 30 minutes
+- {"metrics_name": "service_instance_sla", "top_n": 3, "service_name": "boutique::adservice", 
+  "duration": "1h"}: Get top 3 instances of a specific service with highest SLA
+- {"metrics_name": "service_cpm", "top_n": 5, "start": "-1h", "end": "now", 
+  "step": "MINUTE"}: Get top 5 services with highest calls per minute with custom time range`,
 	queryTopNMetrics,
 	mcp.WithTitleAnnotation("Query top N metrics"),
 	mcp.WithString("metrics_name", mcp.Required(),
-		mcp.Description("The name of the metrics to query. Examples: "+
-			"service_sla, endpoint_sla, service_instance_sla, service_cpm, "+
-			"service_resp_time, service_apdex"),
+		mcp.Description(`The name of the metrics to query. Examples: service_sla, endpoint_sla, 
+service_instance_sla, service_cpm, service_resp_time, service_apdex`),
 	),
 	mcp.WithNumber("top_n", mcp.Required(),
 		mcp.Description("The number of top entities to retrieve. Must be a positive integer."),
 	),
 	mcp.WithString("order",
 		mcp.Enum("ASC", "DES"),
-		mcp.Description("The order by which the top entities are sorted:\n"+
-			"- 'ASC': Ascending order (lowest values first)\n"+
-			"- 'DES': Descending order (highest values first, default)"),
+		mcp.Description(`The order by which the top entities are sorted:
+- 'ASC': Ascending order (lowest values first)
+- 'DES': Descending order (highest values first, default)`),
 	),
 	mcp.WithString("scope",
 		mcp.Enum(string(api.ScopeAll), string(api.ScopeService), string(api.ScopeServiceInstance), string(api.ScopeEndpoint), string(api.ScopeProcess)),
-		mcp.Description("The scope of the metrics entity:\n"+
-			"- 'Service': Service-level metrics (default)\n"+
-			"- 'ServiceInstance': Service instance-level metrics\n"+
-			"- 'Endpoint': Endpoint-level metrics\n"+
-			"- 'Process': Process-level metrics"),
+		mcp.Description(`The scope of the metrics entity:
+- 'Service': Service-level metrics (default)
+- 'ServiceInstance': Service instance-level metrics
+- 'Endpoint': Endpoint-level metrics
+- 'Process': Process-level metrics`),
 	),
 	mcp.WithString("service_name",
 		mcp.Description("Parent service name to filter metrics. Use this to get top N entities within a specific service."),
@@ -454,11 +458,11 @@ var TopNMetricsTool = NewTool[TopNMetricsRequest, *mcp.CallToolResult](
 	),
 	mcp.WithString("step",
 		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
-		mcp.Description("Time step between start time and end time:\n"+
-			"- 'SECOND': Second-level granularity\n"+
-			"- 'MINUTE': Minute-level granularity (default)\n"+
-			"- 'HOUR': Hour-level granularity\n"+
-			"- 'DAY': Day-level granularity"),
+		mcp.Description(`Time step between start time and end time:
+- 'SECOND': Second-level granularity
+- 'MINUTE': Minute-level granularity (default)
+- 'HOUR': Hour-level granularity
+- 'DAY': Day-level granularity`),
 	),
 	mcp.WithBoolean("cold",
 		mcp.Description("Whether to query from cold-stage storage. Set to true for historical data queries."),

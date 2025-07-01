@@ -672,128 +672,134 @@ func filterErrorTraces(traces *api.TraceBrief) []BasicTraceSummary {
 // SearchTraceTool is a tool for searching traces by trace ID with different views
 var SearchTraceTool = NewTool[TraceRequest, *mcp.CallToolResult](
 	"get_trace_details",
-	"This tool provides detailed information about a distributed trace from SkyWalking OAP.\n\n"+
-		"Workflow:\n"+
-		"1. Use this tool when you need to analyze a specific trace by its trace ID\n"+
-		"2. Choose the appropriate view based on your analysis needs:\n"+
-		"   - 'full': For complete trace analysis with all spans and details\n"+
-		"   - 'summary': For quick overview and performance metrics\n"+
-		"   - 'errors_only': For troubleshooting and error investigation\n\n"+
-		"Best Practices:\n"+
-		"- Use 'summary' view first to get an overview of the trace\n"+
-		"- Switch to 'errors_only' if the summary shows errors\n"+
-		"- Use 'full' view for detailed debugging and span-by-span analysis\n"+
-		"- Trace IDs are typically found in logs, error messages, or monitoring dashboards\n\n"+
-		"Examples:\n"+
-		"- {\"trace_id\": \"abc123...\"}: Get complete trace details for analysis\n"+
-		"- {\"trace_id\": \"abc123...\", \"view\": \"summary\"}: Quick performance overview\n"+
-		"- {\"trace_id\": \"abc123...\", \"view\": \"errors_only\"}: Focus on error spans only",
+	`This tool provides detailed information about a distributed trace from SkyWalking OAP.
+
+Workflow:
+1. Use this tool when you need to analyze a specific trace by its trace ID
+2. Choose the appropriate view based on your analysis needs:
+   - 'full': For complete trace analysis with all spans and details
+   - 'summary': For quick overview and performance metrics
+   - 'errors_only': For troubleshooting and error investigation
+
+Best Practices:
+- Use 'summary' view first to get an overview of the trace
+- Switch to 'errors_only' if the summary shows errors
+- Use 'full' view for detailed debugging and span-by-span analysis
+- Trace IDs are typically found in logs, error messages, or monitoring dashboards
+
+Examples:
+- {"trace_id": "abc123..."}: Get complete trace details for analysis
+- {"trace_id": "abc123...", "view": "summary"}: Quick performance overview
+- {"trace_id": "abc123...", "view": "errors_only"}: Focus on error spans only`,
 	searchTrace,
 	mcp.WithTitleAnnotation("Search a trace by TraceId"),
 	mcp.WithString("trace_id", mcp.Required(),
-		mcp.Description("The unique identifier of the trace to retrieve. "+
-			"Trace IDs are typically 32-character hexadecimal strings found in application logs or monitoring systems."),
+		mcp.Description(`The unique identifier of the trace to retrieve.`),
 	),
 	mcp.WithString("view",
 		mcp.Enum(ViewFull, ViewSummary, ViewErrorsOnly),
-		mcp.Description("Specifies the level of detail for trace analysis:\n"+
-			"- 'full': (Default) Complete trace with all spans, service calls, and metadata\n"+
-			"- 'summary': High-level overview with services, duration, and error count\n"+
-			"- 'errors_only': Only spans marked as errors for troubleshooting"),
+		mcp.Description(`Specifies the level of detail for trace analysis:
+- 'full': (Default) Complete trace with all spans, service calls, and metadata
+- 'summary': High-level overview with services, duration, and error count
+- 'errors_only': Only spans marked as errors for troubleshooting`),
 	),
 )
 
 // ColdTraceTool is a tool for searching traces from cold storage by trace ID with different views
 var ColdTraceTool = NewTool[ColdTraceRequest, *mcp.CallToolResult](
 	"get_cold_trace_details",
-	"This tool queries BanyanDB cold storage for historical trace data that may no longer be available in hot storage.\n\n"+
-		"Important Notes:\n"+
-		"- Only works with BanyanDB storage backend\n"+
-		"- Queries older trace data that has been moved to cold storage\n"+
-		"- May have slower response times compared to hot storage queries\n"+
-		"- Use when trace data is not found in regular trace queries\n\n"+
-		"Duration Format:\n"+
-		"- Standard Go duration: \"7d\", \"1h\", \"-30m\", \"2h30m\"\n"+
-		"- Negative values mean \"ago\": \"-7d\" = 7 days ago to now\n"+
-		"- Positive values mean \"from now\": \"2h\" = now to 2 hours later\n"+
-		"- Legacy format: \"6d\", \"12h\" (backward compatible)\n\n"+
-		"Usage Scenarios:\n"+
-		"- Historical incident investigation\n"+
-		"- Long-term performance analysis\n"+
-		"- Compliance and audit requirements\n"+
-		"- When hot storage queries return no results\n\n"+
-		"Examples:\n"+
-		"- {\"trace_id\": \"abc123...\", \"duration\": \"7d\"}: Search last 7 days of cold storage\n"+
-		"- {\"trace_id\": \"abc123...\", \"duration\": \"-30m\"}: Search from 30 minutes ago to now\n"+
-		"- {\"trace_id\": \"abc123...\", \"duration\": \"1h\", \"view\": \"summary\"}: Quick summary from last hour\n"+
-		"- {\"trace_id\": \"abc123...\", \"duration\": \"2h30m\", \"view\": \"errors_only\"}: "+
-		"Error analysis from last 2.5 hours",
+	`This tool queries BanyanDB cold storage for historical trace data that may no longer be available in hot storage.
+
+Important Notes:
+- Only works with BanyanDB storage backend
+- Queries older trace data that has been moved to cold storage
+- May have slower response times compared to hot storage queries
+- Use when trace data is not found in regular trace queries
+
+Duration Format:
+- Standard Go duration: "7d", "1h", "-30m", "2h30m"
+- Negative values mean "ago": "-7d" = 7 days ago to now
+- Positive values mean "from now": "2h" = now to 2 hours later
+- Legacy format: "6d", "12h" (backward compatible)
+
+Usage Scenarios:
+- Historical incident investigation
+- Long-term performance analysis
+- Compliance and audit requirements
+- When hot storage queries return no results
+
+Examples:
+- {"trace_id": "abc123...", "duration": "7d"}: Search last 7 days of cold storage
+- {"trace_id": "abc123...", "duration": "-30m"}: Search from 30 minutes ago to now
+- {"trace_id": "abc123...", "duration": "1h", "view": "summary"}: Quick summary from last hour
+- {"trace_id": "abc123...", "duration": "2h30m", "view": "errors_only"}: Error analysis from last 2.5 hours`,
 	searchColdTrace,
 	mcp.WithTitleAnnotation("Search a cold trace by TraceId"),
 	mcp.WithString("trace_id", mcp.Required(),
-		mcp.Description("The unique identifier of the trace to retrieve from cold storage. "+
-			"Use this when regular trace queries return no results."),
+		mcp.Description(`The unique identifier of the trace to retrieve from cold storage. Use this when regular trace queries return no results.`),
 	),
 	mcp.WithString("duration", mcp.Required(),
-		mcp.Description("Time duration for cold storage query. "+
-			"Examples: \"7d\" (last 7 days), \"-30m\" (last 30 minutes), \"2h30m\" (last 2.5 hours)"),
+		mcp.Description(`Time duration for cold storage query. Examples: "7d" (last 7 days), "-30m" (last 30 minutes), "2h30m" (last 2.5 hours)`),
 	),
 	mcp.WithString("view",
 		mcp.Enum(ViewFull, ViewSummary, ViewErrorsOnly),
-		mcp.Description("Specifies the level of detail for cold trace analysis:\n"+
-			"- 'full': (Default) Complete trace with all spans from cold storage\n"+
-			"- 'summary': High-level overview with services, duration, and error count\n"+
-			"- 'errors_only': Only error spans for focused troubleshooting"),
+		mcp.Description(`Specifies the level of detail for cold trace analysis:
+- 'full': (Default) Complete trace with all spans from cold storage
+- 'summary': High-level overview with services, duration, and error count
+- 'errors_only': Only error spans for focused troubleshooting`),
 	),
 )
 
 // TracesQueryTool is a tool for querying traces with various conditions
 var TracesQueryTool = NewTool[TracesQueryRequest, *mcp.CallToolResult](
 	"query_traces",
-	"This tool queries traces from SkyWalking OAP based on various conditions and provides intelligent data processing for LLM analysis.\n\n"+
-		"Workflow:\n"+
-		"1. Use this tool when you need to find traces matching specific criteria\n"+
-		"2. Specify one or more query conditions to narrow down results\n"+
-		"3. Use duration to limit the time range for the search\n"+
-		"4. Choose the appropriate view for your analysis needs\n\n"+
-		"Query Conditions:\n"+
-		"- service_id: Filter by specific service\n"+
-		"- service_instance_id: Filter by specific service instance\n"+
-		"- trace_id: Search for a specific trace ID\n"+
-		"- endpoint_id: Filter by specific endpoint\n"+
-		"- duration: Time range for the query (e.g., \"1h\", \"7d\", \"-30m\")\n"+
-		"- min_trace_duration/max_trace_duration: Filter by trace duration in milliseconds\n"+
-		"- trace_state: Filter by trace state (success, error, all)\n"+
-		"- query_order: Sort order (start_time, duration, start_time_desc, duration_desc)\n"+
-		"- view: Data presentation format (summary, errors_only, full)\n"+
-		"- slow_trace_threshold: Optional threshold for identifying slow traces in milliseconds\n"+
-		"- tags: Filter by span tags (key-value pairs)\n\n"+
-		"Important Notes:\n"+
-		"- SkyWalking OAP requires either 'duration' or 'trace_id' to be specified\n"+
-		"- If neither is provided, a default duration of \"1h\" (last 1 hour) will be used\n"+
-		"- This ensures the query always has a valid time range or specific trace to search\n\n"+
-		"View Options:\n"+
-		"- 'full': (Default) Complete raw data for detailed analysis\n"+
-		"- 'summary': Intelligent summary with performance metrics and insights\n"+
-		"- 'errors_only': Focused list of error traces for troubleshooting\n\n"+
-		"Best Practices:\n"+
-		"- Start with 'summary' view to get an intelligent overview\n"+
-		"- Use 'errors_only' view for focused troubleshooting\n"+
-		"- Combine multiple filters for precise results\n"+
-		"- Use duration to limit search scope and improve performance\n"+
-		"- Only set slow_trace_threshold when you need to identify performance issues\n"+
-		"- Use tags to filter traces by specific attributes or metadata\n\n"+
-		"Examples:\n"+
-		"- {\"service_id\": \"Your_ApplicationName\", \"duration\": \"1h\", \"view\": \"summary\"}: "+
-		"Recent traces summary with performance insights\n"+
-		"- {\"trace_state\": \"error\", \"duration\": \"7d\", \"view\": \"errors_only\"}: "+
-		"Error traces from last week for troubleshooting\n"+
-		"- {\"min_trace_duration\": 1000, \"query_order\": \"duration_desc\", \"view\": \"summary\"}: "+
-		"Slow traces analysis with performance metrics\n"+
-		"- {\"slow_trace_threshold\": 5000, \"view\": \"summary\"}: Identify traces slower than 5 seconds\n"+
-		"- {\"service_id\": \"Your_ApplicationName\"}: Query with default 1-hour duration\n"+
-		"- {\"tags\": [{\"key\": \"http.method\", \"value\": \"POST\"}, {\"key\": \"http.status_code\", \"value\": \"500\"}], \"duration\": \"1h\"}: "+
-		"Find traces with specific HTTP tags",
+	`This tool queries traces from SkyWalking OAP based on various conditions and provides intelligent data processing for LLM analysis.
+
+Workflow:
+1. Use this tool when you need to find traces matching specific criteria
+2. Specify one or more query conditions to narrow down results
+3. Use duration to limit the time range for the search
+4. Choose the appropriate view for your analysis needs
+
+Query Conditions:
+- service_id: Filter by specific service
+- service_instance_id: Filter by specific service instance
+- trace_id: Search for a specific trace ID
+- endpoint_id: Filter by specific endpoint
+- duration: Time range for the query (e.g., "1h", "7d", "-30m")
+- min_trace_duration/max_trace_duration: Filter by trace duration in milliseconds
+- trace_state: Filter by trace state (success, error, all)
+- query_order: Sort order (start_time, duration, start_time_desc, duration_desc)
+- view: Data presentation format (summary, errors_only, full)
+- slow_trace_threshold: Optional threshold for identifying slow traces in milliseconds
+- tags: Filter by span tags (key-value pairs)
+
+Important Notes:
+- SkyWalking OAP requires either 'duration' or 'trace_id' to be specified
+- If neither is provided, a default duration of "1h" (last 1 hour) will be used
+- This ensures the query always has a valid time range or specific trace to search
+
+View Options:
+- 'full': (Default) Complete raw data for detailed analysis
+- 'summary': Intelligent summary with performance metrics and insights
+- 'errors_only': Focused list of error traces for troubleshooting
+
+Best Practices:
+- Start with 'summary' view to get an intelligent overview
+- Use 'errors_only' view for focused troubleshooting
+- Combine multiple filters for precise results
+- Use duration to limit search scope and improve performance
+- Only set slow_trace_threshold when you need to identify performance issues
+- Use tags to filter traces by specific attributes or metadata
+
+Examples:
+- {"service_id": "Your_ApplicationName", "duration": "1h", "view": "summary"}: Recent traces summary with performance insights
+- {"trace_state": "error", "duration": "7d", "view": "errors_only"}: Error traces from last week for troubleshooting
+- {"min_trace_duration": 1000, "query_order": "duration_desc", "view": "summary"}: Slow traces analysis with performance metrics
+- {"slow_trace_threshold": 5000, "view": "summary"}: Identify traces slower than 5 seconds
+- {"service_id": "Your_ApplicationName"}: Query with default 1-hour duration
+- {"tags": [{"key": "http.method", "value": "POST"}, {"key": "http.status_code", "value": "500"}], 
+  "duration": "1h"}: Find traces with specific HTTP tags`,
 	searchTraces,
 	mcp.WithTitleAnnotation("Query traces with intelligent analysis"),
 	mcp.WithString("service_id",
@@ -809,8 +815,7 @@ var TracesQueryTool = NewTool[TracesQueryRequest, *mcp.CallToolResult](
 		mcp.Description("Endpoint ID to filter traces. Use this to find traces for a specific endpoint."),
 	),
 	mcp.WithString("duration",
-		mcp.Description("Time duration for the query. Examples: \"7d\" (last 7 days), \"-30m\" (last 30 minutes), "+
-			"\"2h30m\" (last 2.5 hours)"),
+		mcp.Description(`Time duration for the query. Examples: "7d" (last 7 days), "-30m" (last 30 minutes), "2h30m" (last 2.5 hours)`),
 	),
 	mcp.WithNumber("min_trace_duration",
 		mcp.Description("Minimum trace duration in milliseconds. Use this to filter out fast traces."),
@@ -820,23 +825,23 @@ var TracesQueryTool = NewTool[TracesQueryRequest, *mcp.CallToolResult](
 	),
 	mcp.WithString("trace_state",
 		mcp.Enum(TraceStateSuccess, TraceStateError, TraceStateAll),
-		mcp.Description("Filter traces by their state:\n"+
-			"- 'success': Only successful traces\n"+
-			"- 'error': Only traces with errors\n"+
-			"- 'all': All traces (default)"),
+		mcp.Description(`Filter traces by their state:
+- 'success': Only successful traces
+- 'error': Only traces with errors
+- 'all': All traces (default)`),
 	),
 	mcp.WithString("query_order",
 		mcp.Enum(QueryOrderStartTime, QueryOrderDuration),
-		mcp.Description("Sort order for results:\n"+
-			"- 'start_time': Oldest first\n"+
-			"- 'duration': Shortest first"),
+		mcp.Description(`Sort order for results:
+- 'start_time': Oldest first
+- 'duration': Shortest first`),
 	),
 	mcp.WithString("view",
 		mcp.Enum(ViewSummary, ViewErrorsOnly, ViewFull),
-		mcp.Description("Data presentation format:\n"+
-			"- 'full': (Default) Complete raw data for detailed analysis\n"+
-			"- 'summary': Intelligent summary with performance metrics and insights\n"+
-			"- 'errors_only': Focused list of error traces for troubleshooting"),
+		mcp.Description(`Data presentation format:
+- 'full': (Default) Complete raw data for detailed analysis
+- 'summary': Intelligent summary with performance metrics and insights
+- 'errors_only': Focused list of error traces for troubleshooting`),
 	),
 	mcp.WithNumber("slow_trace_threshold",
 		mcp.Description("Optional threshold for identifying slow traces in milliseconds. "+
@@ -845,8 +850,8 @@ var TracesQueryTool = NewTool[TracesQueryRequest, *mcp.CallToolResult](
 			"Examples: 500 (0.5s), 2000 (2s), 5000 (5s)"),
 	),
 	mcp.WithArray("tags",
-		mcp.Description("Array of span tags to filter traces. Each tag should have 'key' and 'value' fields. "+
-			"Examples: [{\"key\": \"http.method\", \"value\": \"POST\"}, {\"key\": \"http.status_code\", \"value\": \"500\"}]"),
+		mcp.Description(`Array of span tags to filter traces. Each tag should have 'key' and 'value' fields. 
+Examples: [{"key": "http.method", "value": "POST"}, {"key": "http.status_code", "value": "500"}]`),
 	),
 	mcp.WithBoolean("cold",
 		mcp.Description("Whether to query from cold-stage storage. Set to true for historical data queries."),

@@ -98,18 +98,19 @@ func queryLogs(ctx context.Context, req *LogQueryRequest) (*mcp.CallToolResult, 
 
 var LogQueryTool = NewTool[LogQueryRequest, *mcp.CallToolResult](
 	"query_logs",
-	"Query logs from SkyWalking OAP with flexible filters.\n\n"+
-		"Workflow:\n"+
-		"1. Use this tool to find logs matching specific criteria\n"+
-		"2. Specify one or more query conditions to narrow down results\n"+
-		"3. Use duration to limit the time range for the search\n"+
-		"4. Supports filtering by service, instance, endpoint, trace, tags, and time\n"+
-		"5. Supports cold storage query and pagination\n\n"+
-		"Examples:\n"+
-		"- {\"service_id\": \"Your_ApplicationName\", \"start\": \"2024-06-01 12:00:00\", "+
-		"\"end\": \"2024-06-01 13:00:00\"}: Query logs for a service in a time range\n"+
-		"- {\"trace_id\": \"abc123...\"}: Query logs related to a specific trace\n"+
-		"- {\"tags\": [{\"key\": \"level\", \"value\": \"ERROR\"}], \"cold\": true}: Query error logs from cold storage\n",
+	`Query logs from SkyWalking OAP with flexible filters.
+
+Workflow:
+1. Use this tool to find logs matching specific criteria
+2. Specify one or more query conditions to narrow down results
+3. Use duration to limit the time range for the search
+4. Supports filtering by service, instance, endpoint, trace, tags, and time
+5. Supports cold storage query and pagination
+
+Examples:
+- {"service_id": "Your_ApplicationName", "start": "2024-06-01 12:00:00", "end": "2024-06-01 13:00:00"}: Query logs for a service in a time range
+- {"trace_id": "abc123..."}: Query logs related to a specific trace
+- {"tags": [{"key": "level", "value": "ERROR"}], "cold": true}: Query error logs from cold storage`,
 	queryLogs,
 	mcp.WithString("service_id", mcp.Description("Service ID to filter logs.")),
 	mcp.WithString("service_instance_id", mcp.Description("Service instance ID to filter logs.")),

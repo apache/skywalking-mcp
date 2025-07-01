@@ -20,6 +20,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    reviewers:
+      - "CodePrometheus"
     assignees:
       - "CodePrometheus"
     ignore:
