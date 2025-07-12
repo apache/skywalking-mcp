@@ -370,10 +370,12 @@ service_instance_sla, service_cpm, service_resp_time, service_apdex`),
 	mcp.WithString("step",
 		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
 		mcp.Description(`Time step between start time and end time:
-- 'SECOND': Second-level granularity
-- 'MINUTE': Minute-level granularity (default)
-- 'HOUR': Hour-level granularity
-- 'DAY': Day-level granularity`),
+|- 'SECOND': Second-level granularity
+|- 'MINUTE': Minute-level granularity
+|- 'HOUR': Hour-level granularity
+|- 'DAY': Day-level granularity
+If not specified, uses adaptive step sizing: 
+SECOND (<1h), MINUTE (1h-24h), HOUR (1d-7d), DAY (>7d)`),
 	),
 	mcp.WithBoolean("cold",
 		mcp.Description("Whether to query from cold-stage storage. Set to true for historical data queries."),
@@ -459,10 +461,12 @@ service_instance_sla, service_cpm, service_resp_time, service_apdex`),
 	mcp.WithString("step",
 		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
 		mcp.Description(`Time step between start time and end time:
-- 'SECOND': Second-level granularity
-- 'MINUTE': Minute-level granularity (default)
-- 'HOUR': Hour-level granularity
-- 'DAY': Day-level granularity`),
+|- 'SECOND': Second-level granularity
+|- 'MINUTE': Minute-level granularity
+|- 'HOUR': Hour-level granularity
+|- 'DAY': Day-level granularity
+If not specified, uses adaptive step sizing: 
+SECOND (<1h), MINUTE (1h-24h), HOUR (1d-7d), DAY (>7d)`),
 	),
 	mcp.WithBoolean("cold",
 		mcp.Description("Whether to query from cold-stage storage. Set to true for historical data queries."),

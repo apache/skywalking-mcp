@@ -119,7 +119,10 @@ Examples:
 	mcp.WithArray("tags", mcp.Description("Array of log tags, each with key and value.")),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
 	mcp.WithString("end", mcp.Description("End time for the query.")),
-	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"), mcp.Description("Time step granularity.")),
+	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
+		mcp.Description("Time step granularity: SECOND, MINUTE, HOUR, DAY. "+
+			"If not specified, uses adaptive step sizing: "+
+			"SECOND (<1h), MINUTE (1h-24h), HOUR (1d-7d), DAY (>7d)")),
 	mcp.WithBoolean("cold", mcp.Description("Whether to query from cold-stage storage.")),
 	mcp.WithNumber("page_num", mcp.Description("Page number, default 1.")),
 	mcp.WithNumber("page_size", mcp.Description("Page size, default 15.")),

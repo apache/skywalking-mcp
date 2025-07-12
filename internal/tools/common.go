@@ -78,7 +78,8 @@ func ParseDuration(durationStr string, coldStage bool) api.Duration {
 			startTime = now
 			endTime = now.Add(duration)
 		}
-		step = determineStep(duration)
+		// Use adaptive step based on time range
+		step = determineAdaptiveStep(startTime, endTime)
 	} else {
 		startTime, endTime, step = parseLegacyDuration(durationStr)
 	}
@@ -113,12 +114,13 @@ func BuildPagination(pageNum, pageSize int) *api.Pagination {
 func BuildDuration(start, end, step string, cold bool, defaultDurationMinutes int) api.Duration {
 	if start != "" || end != "" {
 		stepEnum := api.Step(step)
-		if step == "" || !stepEnum.IsValid() {
-			stepEnum = api.StepMinute
-		}
-
 		// Parse and format start and end times
 		startTime, endTime := parseStartEndTimes(start, end)
+
+		// If step is not provided or invalid, determine it adaptively based on time range
+		if step == "" || !stepEnum.IsValid() {
+			stepEnum = determineAdaptiveStep(startTime, endTime)
+		}
 
 		return api.Duration{
 			Start:     FormatTimeByStep(startTime, stepEnum),
@@ -135,15 +137,17 @@ func BuildDuration(start, end, step string, cold bool, defaultDurationMinutes in
 	return ParseDuration(defaultDurationStr, cold)
 }
 
-// determineStep determines the step based on the duration
-func determineStep(duration time.Duration) api.Step {
-	if duration >= 24*time.Hour {
+// determineAdaptiveStep determines the adaptive step based on the time range
+func determineAdaptiveStep(startTime, endTime time.Time) api.Step {
+	duration := endTime.Sub(startTime)
+	if duration >= 7*24*time.Hour {
 		return api.StepDay
-	} else if duration >= time.Hour {
+	} else if duration >= 24*time.Hour {
 		return api.StepHour
-	} else if duration >= time.Minute {
+	} else if duration >= time.Hour {
 		return api.StepMinute
 	}
+
 	return api.StepSecond
 }
 

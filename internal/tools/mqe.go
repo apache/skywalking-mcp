@@ -490,10 +490,11 @@ Entity Filtering (all optional):
 - Relation queries: dest_service_name + dest_layer, dest_service_instance_name, etc.
 
 Examples:
-- {expression: "service_sla * 100", service_name: "Your_ApplicationName", layer: "GENERAL", duration: "1h"}: Convert SLA to percentage for last hour
+- {expression: "service_sla * 100", service_name: "Your_ApplicationName", layer: "GENERAL", duration: "-1h"}: Convert SLA to percentage for last hour
 - {expression: "service_resp_time > 3000 && service_cpm < 1000", service_name: "Your_ApplicationName", 
-  duration: "30m"}: Find high latency with low traffic
-- {expression: "avg(service_cpm)", duration: "2h"}: Calculate average CPM for last 2 hours
+  duration: "-30m"}: Find high latency with low traffic in last 30 minutes
+- {expression: "avg(service_cpm)", duration: "-2h"}: Calculate average CPM for last 2 hours
+- {expression: "service_cpm", duration: "24h"}: Query CPM for next 24 hours (useful for capacity planning)
 - {expression: "top_n(service_cpm, 10, des)", start: "2025-07-06 16:00:00", end: "2025-07-06 17:00:00", 
   step: "MINUTE"}: Top 10 services by CPM with minute granularity`,
 	executeMQEExpression,
@@ -520,15 +521,18 @@ Examples:
 	mcp.WithString("dest_process_name", mcp.Description("Destination process name for relation metrics")),
 	mcp.WithBoolean("dest_normal", mcp.Description("Whether the destination service is normal")),
 	mcp.WithString("duration",
-		mcp.Description("Time duration for the query. "+
-			"Examples: `1h` (last 1 hour), `30m` (last 30 minutes), `7d` (last 7 days). "+
+		mcp.Description("Time duration for the query relative to current time. "+
+			"Negative values query the past: `-1h` (last 1 hour), `-30m` (last 30 minutes), `-7d` (last 7 days). "+
+			"Positive values query the future: `1h` (next 1 hour), `24h` (next 24 hours). "+
 			"Use this OR specify both start+end")),
 	mcp.WithString("start", mcp.Description("Start time for the query. Examples: `2025-07-06 12:00:00`, `-1h` (1 hour ago), `-30m` (30 minutes ago)")),
 	mcp.WithString("end", mcp.Description("End time for the query. Examples: `2025-07-06 13:00:00`, `now`, `-10m` (10 minutes ago)")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY", "MONTH"),
 		mcp.Description("Time step between start time and end time: "+
-			"SECOND (second-level), MINUTE (minute-level, default), HOUR (hour-level), "+
-			"DAY (day-level), MONTH (month-level)")),
+			"SECOND (second-level), MINUTE (minute-level), HOUR (hour-level), "+
+			"DAY (day-level), MONTH (month-level). "+
+			"If not specified, uses adaptive step sizing: "+
+			"SECOND (<1h), MINUTE (1h-24h), HOUR (1d-7d), DAY (>7d)")),
 	mcp.WithBoolean("cold", mcp.Description("Whether to query from cold-stage storage")),
 	mcp.WithBoolean("debug", mcp.Description("Enable query tracing and debugging")),
 	mcp.WithBoolean("dump_db_rsp", mcp.Description("Dump database response for debugging")),
