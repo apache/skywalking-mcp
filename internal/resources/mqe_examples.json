@@ -1,0 +1,136 @@
+{
+  "examples": [
+    {
+      "description": "Query service response time",
+      "natural_language": "What is the average response time for service 'frontend'?",
+      "mqe_expression": "avg(service_resp_time)",
+      "notes": "Returns average response time in milliseconds"
+    },
+    {
+      "description": "Service SLA percentage",
+      "natural_language": "Show me the success rate for service 'backend' as a percentage",
+      "mqe_expression": "service_sla * 100",
+      "notes": "Converts SLA from decimal (0-1) to percentage (0-100)"
+    },
+    {
+      "description": "Response time percentiles",
+      "natural_language": "Get the P50, P75, P90, P95, and P99 response times",
+      "mqe_expression": "service_percentile{p='50,75,90,95,99'}",
+      "notes": "Returns multiple percentile values with labels"
+    },
+    {
+      "description": "Rename percentile labels",
+      "natural_language": "Get response time percentiles with custom labels",
+      "mqe_expression": "relabel(service_percentile{p='50,75,90,95,99'}, p='50,75,90,95,99', percentile='P50,P75,P90,P95,P99')",
+      "notes": "Relabels the percentile values for better readability"
+    },
+    {
+      "description": "Calls per minute above threshold",
+      "natural_language": "Is the service receiving more than 1000 calls per minute?",
+      "mqe_expression": "service_cpm > 1000",
+      "notes": "Returns 1 if true, 0 if false"
+    },
+    {
+      "description": "Service response time alert condition",
+      "natural_language": "Alert when average response time is over 1 second",
+      "mqe_expression": "avg(service_resp_time) > 1000",
+      "notes": "Used in alarm rules, checks if average response time exceeds 1000ms"
+    },
+    {
+      "description": "Service SLA below threshold alert",
+      "natural_language": "Alert when service success rate drops below 85%",
+      "mqe_expression": "sum((service_sla * 100) < 85) >= 4",
+      "notes": "Triggers when SLA is below 85% for 4 or more time buckets"
+    },
+    {
+      "description": "Multiple percentiles above threshold",
+      "natural_language": "Alert when multiple percentiles exceed 1 second",
+      "mqe_expression": "sum(service_percentile{p='50,75,90,95,99'} > 1000) >= 3",
+      "notes": "Triggers when 3 or more percentiles exceed 1000ms"
+    },
+    {
+      "description": "Combined SLA and response time condition",
+      "natural_language": "Alert when both SLA is low AND response time is high",
+      "mqe_expression": "(avg(service_sla * 100) < 80) && (avg(service_percentile{p='50'}) > 1000)",
+      "notes": "Complex condition using boolean AND operator"
+    },
+    {
+      "description": "Top 10 services by CPM",
+      "natural_language": "Which are the top 10 busiest services by calls per minute?",
+      "mqe_expression": "top_n(service_cpm, 10, des)",
+      "notes": "Returns sorted list of top 10 services"
+    },
+    {
+      "description": "Top 10 instances of a service",
+      "natural_language": "Show the top 10 instances by CPM for a specific service",
+      "mqe_expression": "top_n(service_instance_cpm, 10, des)",
+      "notes": "Use with entity.serviceName to get instances of that service"
+    },
+    {
+      "description": "Filter top services by layer",
+      "natural_language": "Get top 10 general services by CPM",
+      "mqe_expression": "top_n(service_cpm, 10, des, attr0='GENERAL')",
+      "notes": "Filters results by service layer attribute"
+    },
+    {
+      "description": "HTTP error rate monitoring",
+      "natural_language": "Monitor 4xx and 5xx error rates",
+      "mqe_expression": "sum(aggregate_labels(meter_status_code{status='4xx,5xx'},sum) > 10) > 3",
+      "notes": "Aggregates error status codes and alerts on high error count"
+    },
+    {
+      "description": "Instance response time with regex filter",
+      "natural_language": "Monitor instances matching a pattern",
+      "mqe_expression": "avg(service_instance_resp_time)",
+      "notes": "Use with include-names-regex in alarm rules to filter instances"
+    },
+    {
+      "description": "Endpoint success rate monitoring",
+      "natural_language": "Alert when endpoint success rate is below 75%",
+      "mqe_expression": "sum((endpoint_sla * 100) < 75) >= 3",
+      "notes": "Monitors specific endpoint performance"
+    },
+    {
+      "description": "Service CPM in requests per second",
+      "natural_language": "Convert calls per minute to requests per second",
+      "mqe_expression": "round(service_cpm / 60, 2)",
+      "notes": "Converts CPM to RPS with 2 decimal places"
+    },
+    {
+      "description": "Service response time trend",
+      "natural_language": "Show the rate of change in response time",
+      "mqe_expression": "rate(service_resp_time, 5)",
+      "notes": "Calculates per-second rate of change over 5-minute window"
+    },
+    {
+      "description": "Response time increase over period",
+      "natural_language": "How much has response time increased in the last 2 minutes?",
+      "mqe_expression": "increase(service_resp_time, 2)",
+      "notes": "Shows absolute increase over time range"
+    },
+    {
+      "description": "Sort service response times",
+      "natural_language": "Get top 10 slowest response times",
+      "mqe_expression": "sort_values(service_resp_time, 10, des)",
+      "notes": "Sorts values in descending order, returns top 10"
+    },
+    {
+      "description": "First available metric fallback",
+      "natural_language": "Use service CPM or fallback to instance CPM",
+      "mqe_expression": "view_as_seq([service_cpm, service_instance_cpm])",
+      "notes": "Returns first non-null metric in sequence"
+    },
+    {
+      "description": "Check if metrics exist",
+      "natural_language": "Check if any monitoring data is available",
+      "mqe_expression": "is_present([service_cpm, service_resp_time, service_sla])",
+      "notes": "Returns 1 if any metric has values, 0 otherwise"
+    },
+    {
+      "description": "Baseline comparison",
+      "natural_language": "Compare response time to predicted baseline",
+      "mqe_expression": "sum(service_resp_time > baseline(service_resp_time, upper)) > 3",
+      "notes": "Alert when response time exceeds upper baseline prediction"
+    }
+  ]
+}

@@ -385,7 +385,7 @@ func listMQEMetrics(ctx context.Context, req *MQEMetricsListRequest) (*mcp.CallT
 	`
 
 	variables := map[string]interface{}{}
-	if req.Regex != "" {
+	if req != nil && req.Regex != "" {
 		variables["regex"] = req.Regex
 	}
 
@@ -399,6 +399,25 @@ func listMQEMetrics(ctx context.Context, req *MQEMetricsListRequest) (*mcp.CallT
 		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
 	}
 	return mcp.NewToolResultText(string(jsonBytes)), nil
+}
+
+// ListMQEMetricsInternal is an exported function for internal use by resources package
+func ListMQEMetricsInternal(ctx context.Context, regex *string) (string, error) {
+	var req *MQEMetricsListRequest
+	if regex != nil {
+		req = &MQEMetricsListRequest{Regex: *regex}
+	}
+	result, err := listMQEMetrics(ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	// Extract the text content from the tool result
+	if textResult, ok := result.Content[0].(mcp.TextContent); ok {
+		return textResult.Text, nil
+	}
+
+	return "", fmt.Errorf("unexpected result format")
 }
 
 // getMQEMetricsType gets metric type information
