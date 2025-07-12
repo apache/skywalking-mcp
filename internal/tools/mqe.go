@@ -522,7 +522,7 @@ Examples:
 	mcp.WithBoolean("dest_normal", mcp.Description("Whether the destination service is normal")),
 	mcp.WithString("duration",
 		mcp.Description("Time duration for the query relative to current time. "+
-			"Negative values query the past: `-1h` (last 1 hour), `-30m` (last 30 minutes), `-7d` (last 7 days). "+
+			"Negative values query the past: `-1h` (past 1 hour), `-30m` (past 30 minutes), `-7d` (past 7 days). "+
 			"Positive values query the future: `1h` (next 1 hour), `24h` (next 24 hours). "+
 			"Use this OR specify both start+end")),
 	mcp.WithString("start", mcp.Description("Start time for the query. Examples: `2025-07-06 12:00:00`, `-1h` (1 hour ago), `-30m` (30 minutes ago)")),

@@ -27,7 +27,7 @@ import (
 
 // Constants for common values
 const (
-	defaultDuration = "1h"
+	defaultDuration = "-1h"
 	allMetrics      = "all"
 )
 
@@ -76,7 +76,8 @@ func addCoreAnalysisPrompts(s *server.MCPServer) {
 		Description: "Analyze service performance using metrics tools",
 		Arguments: []mcp.PromptArgument{
 			{Name: "service_name", Description: "The name of the service to analyze", Required: true},
-			{Name: "duration", Description: "Time duration for analysis (e.g., 1h, 24h, 7d)", Required: false},
+			{Name: "duration", Description: "Time duration for analysis. Examples: -1h (past hour), -30m (past 30 minutes), " +
+				"-7d (past 7 days), 1h (next hour), 24h (next 24 hours)", Required: false},
 		},
 	}, performanceAnalysisHandler)
 
@@ -87,7 +88,7 @@ func addCoreAnalysisPrompts(s *server.MCPServer) {
 		Arguments: []mcp.PromptArgument{
 			{Name: "services", Description: "Comma-separated list of service names to compare", Required: true},
 			{Name: "metrics", Description: "Metrics to compare (response_time, sla, cpm, all)", Required: false},
-			{Name: "time_range", Description: "Time range for comparison", Required: false},
+			{Name: "time_range", Description: "Time range for comparison. Examples: -1h (last hour), -2h (last 2 hours), -1d (last day)", Required: false},
 		},
 	}, compareServicesHandler)
 
@@ -111,7 +112,7 @@ func addTraceAnalysisPrompts(s *server.MCPServer) {
 		Arguments: []mcp.PromptArgument{
 			{Name: "service_id", Description: "The service to investigate", Required: false},
 			{Name: "trace_state", Description: "Filter by trace state (success, error, all)", Required: false},
-			{Name: "duration", Description: "Time range to search (default: 1h)", Required: false},
+			{Name: "duration", Description: "Time range to search. Examples: -1h (last hour), -30m (last 30 minutes). Default: -1h", Required: false},
 		},
 	}, traceInvestigationHandler)
 
@@ -133,7 +134,7 @@ func addTraceAnalysisPrompts(s *server.MCPServer) {
 		Arguments: []mcp.PromptArgument{
 			{Name: "service_id", Description: "Service to analyze logs", Required: false},
 			{Name: "log_level", Description: "Log level to filter (ERROR, WARN, INFO)", Required: false},
-			{Name: "duration", Description: "Time range to analyze (default: 1h)", Required: false},
+			{Name: "duration", Description: "Time range to analyze. Examples: -1h (last hour), -6h (last 6 hours). Default: -1h", Required: false},
 		},
 	}, logAnalysisHandler)
 }
@@ -516,7 +517,7 @@ func topServicesHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.G
   - metrics_name: "%s"
   - top_n: %s
   - order: "%s" (DES for highest, ASC for lowest)
-  - duration: "1h" (or specify custom range)
+  - duration: "-1h" (or specify custom range)
 
 **Analysis Focus:**
 

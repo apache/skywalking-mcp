@@ -309,9 +309,9 @@ Time Format:
 - Step: "SECOND", "MINUTE", "HOUR", "DAY"
 
 Examples:
-- {"metrics_name": "service_cpm", "service_name": "business-zone::projectC", "duration": "1h"}: Get calls per minute for a service in the last hour
+- {"metrics_name": "service_cpm", "service_name": "business-zone::projectC", "duration": "-1h"}: Get calls per minute for a service in the past hour
 - {"metrics_name": "endpoint_cpm", "service_name": "business-zone::projectC", 
-  "endpoint_name": "/projectC/{value}", "duration": "30m"}: Get calls per minute for a specific endpoint in the last 30 minutes
+  "endpoint_name": "/projectC/{value}", "duration": "-30m"}: Get calls per minute for a specific endpoint in the past 30 minutes
 - {"metrics_name": "service_resp_time", "service_name": "web-service", 
   "start": "-1h", "end": "now", "step": "MINUTE"}: Get service response time with custom time range
 - {"metrics_name": "service_apdex", "service_name": "api-gateway", "cold": true}: Get Apdex score from cold storage`,
@@ -359,7 +359,9 @@ service_instance_sla, service_cpm, service_resp_time, service_apdex`),
 		mcp.Description("Destination process name for relationship metrics. Use this for process relation scopes."),
 	),
 	mcp.WithString("duration",
-		mcp.Description("Time duration for the query. Examples: \"1h\" (last 1 hour), \"30m\" (last 30 minutes), \"7d\" (last 7 days)"),
+		mcp.Description("Time duration for the query relative to current time. "+
+			"Negative values query the past: \"-1h\" (past 1 hour), \"-30m\" (past 30 minutes), \"-7d\" (past 7 days). "+
+			"Positive values query the future: \"1h\" (next 1 hour), \"24h\" (next 24 hours)"),
 	),
 	mcp.WithString("start",
 		mcp.Description("Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)"),
@@ -417,10 +419,10 @@ Time Format:
 - Step: "SECOND", "MINUTE", "HOUR", "DAY"
 
 Examples:
-- {"metrics_name": "service_sla", "top_n": 5, "duration": "1h"}: Get top 5 services with highest SLA in the last hour
-- {"metrics_name": "endpoint_sla", "top_n": 10, "order": "ASC", "duration": "30m"}: Get top 10 endpoints with lowest SLA in the last 30 minutes
+- {"metrics_name": "service_sla", "top_n": 5, "duration": "-1h"}: Get top 5 services with highest SLA in the past hour
+- {"metrics_name": "endpoint_sla", "top_n": 10, "order": "ASC", "duration": "-30m"}: Get top 10 endpoints with lowest SLA in the past 30 minutes
 - {"metrics_name": "service_instance_sla", "top_n": 3, "service_name": "boutique::adservice", 
-  "duration": "1h"}: Get top 3 instances of a specific service with highest SLA
+  "duration": "-1h"}: Get top 3 instances of a specific service with highest SLA in the past hour
 - {"metrics_name": "service_cpm", "top_n": 5, "start": "-1h", "end": "now", 
   "step": "MINUTE"}: Get top 5 services with highest calls per minute with custom time range`,
 	queryTopNMetrics,
@@ -450,7 +452,9 @@ service_instance_sla, service_cpm, service_resp_time, service_apdex`),
 		mcp.Description("Parent service name to filter metrics. Use this to get top N entities within a specific service."),
 	),
 	mcp.WithString("duration",
-		mcp.Description("Time duration for the query. Examples: \"1h\" (last 1 hour), \"30m\" (last 30 minutes), \"7d\" (last 7 days)"),
+		mcp.Description("Time duration for the query relative to current time. "+
+			"Negative values query the past: \"-1h\" (past 1 hour), \"-30m\" (past 30 minutes), \"-7d\" (past 7 days). "+
+			"Positive values query the future: \"1h\" (next 1 hour), \"24h\" (next 24 hours)"),
 	),
 	mcp.WithString("start",
 		mcp.Description("Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)"),

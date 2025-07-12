@@ -276,10 +276,9 @@ relabel(
 - "or" → `||`
 
 ### 10.3 Time Range Mappings
-- "last hour", "past hour" → `duration: "1h"`
-- "last 30 minutes" → `duration: "30m"`
-- "today" → Calculate today's start and end time
-- "this week" → Calculate this week's start and end time
+- "last hour", "past hour" (past) → `duration: "-1h"`
+- "last 30 minutes" (past) → `duration: "-30m"`
+- "next 30 minutes" (future) → `duration: "30m"`
 
 ## 11. Model Understanding Guidelines
 

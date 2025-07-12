@@ -41,17 +41,26 @@ Users may express the same metric in various ways:
 ### 2. Time Range Understanding
 
 #### 2.1 Relative Time
+**Past Time (negative duration)**:
 - "recently/past/just now" + number + unit
-  - "recent 5 minutes" → `duration: "5m"`
-  - "past one hour" → `duration: "1h"`
-  - "recent one day" → `duration: "24h"` or `duration: "1d"`
+  - "recent 5 minutes" → `duration: "-5m"`
+  - "past one hour" → `duration: "-1h"`
+  - "recent one day" → `duration: "-24h"` or `duration: "-1d"`
+
+**Future Time (positive duration)**:
+- "next/future/upcoming/coming" + number + unit
+  - "next 5 minutes" → `duration: "5m"`
+  - "upcoming one hour" → `duration: "1h"`
+  - "next day" → `duration: "24h"` or `duration: "1d"`
 
 #### 2.2 Fuzzy Time
-- "just now" → `duration: "5m"` (defaults to 5 minutes)
-- "recently" → `duration: "1h"` (defaults to 1 hour)
-- "today" → from today's 00:00 to now
-- "yesterday" → from 00:00 to 24:00 yesterday
-- "this week" → from Monday 00:00 to now this week
+**Past-oriented (negative)**:
+- "just now" → `duration: "-5m"` (defaults to 5 minutes)
+- "recently" → `duration: "-1h"` (defaults to 1 hour)
+
+**Future-oriented (positive)**:
+- "soon" → `duration: "5m"` (defaults to next 5 minutes)
+- "later" → `duration: "1h"` (defaults to next 1 hour)
 
 #### 2.3 Absolute Time
 - "from...to..." → use start and end
@@ -139,7 +148,7 @@ User: "slowest 10 services"
 User: "check the recent average response time for service A"
 Response: "I will query the average response time for service A in the last hour:"
 Expression: avg(service_resp_time)
-Parameters: service_name="A", duration="1h"
+Parameters: service_name="A", duration="-1h"
 ```
 
 #### 8.2 Providing Alternatives
