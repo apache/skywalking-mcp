@@ -93,9 +93,11 @@ type TraceRequest struct {
 
 // ColdTraceRequest defines the parameters for the cold trace tool
 type ColdTraceRequest struct {
-	TraceID  string `json:"trace_id"`
-	Duration string `json:"duration"`
-	View     string `json:"view,omitempty"`
+	TraceID string `json:"trace_id"`
+	Start   string `json:"start,omitempty"`
+	End     string `json:"end,omitempty"`
+	Step    string `json:"step,omitempty"`
+	View    string `json:"view,omitempty"`
 }
 
 // SpanTag represents a span tag for filtering traces
@@ -110,7 +112,9 @@ type TracesQueryRequest struct {
 	ServiceInstanceID  string    `json:"service_instance_id,omitempty"`
 	TraceID            string    `json:"trace_id,omitempty"`
 	EndpointID         string    `json:"endpoint_id,omitempty"`
-	Duration           string    `json:"duration,omitempty"`
+	Start              string    `json:"start,omitempty"`
+	End                string    `json:"end,omitempty"`
+	Step               string    `json:"step,omitempty"`
 	MinTraceDuration   int64     `json:"min_trace_duration,omitempty"`
 	MaxTraceDuration   int64     `json:"max_trace_duration,omitempty"`
 	TraceState         string    `json:"trace_state,omitempty"`
@@ -220,9 +224,6 @@ func validateColdTraceRequest(req ColdTraceRequest) error {
 	if req.TraceID == "" {
 		return errors.New(ErrMissingTraceID)
 	}
-	if req.Duration == "" {
-		return errors.New(ErrMissingDuration)
-	}
 	return nil
 }
 
@@ -253,9 +254,9 @@ func searchColdTrace(ctx context.Context, req *ColdTraceRequest) (*mcp.CallToolR
 		req.View = ViewFull // Set default value
 	}
 
-	// Parse duration string to api.Duration
+	// Build duration from time range (defaults to last 1 hour)
 	timeCtx := GetTimeContext(ctx)
-	duration := ParseDurationWithContext(req.Duration, true, timeCtx)
+	duration := BuildDurationWithContext(req.Start, req.End, req.Step, true, 60, timeCtx)
 
 	traces, err := trace.ColdTrace(ctx, duration, req.TraceID)
 	if err != nil {
@@ -318,7 +319,7 @@ func filterErrorSpans(traceData *api.Trace) []*api.Span {
 func validateTracesQueryRequest(req *TracesQueryRequest) error {
 	// At least one filter should be provided for meaningful results
 	if req.ServiceID == "" && req.ServiceInstanceID == "" && req.TraceID == "" &&
-		req.EndpointID == "" && req.Duration == "" && req.MinTraceDuration == 0 &&
+		req.EndpointID == "" && req.Start == "" && req.End == "" && req.MinTraceDuration == 0 &&
 		req.MaxTraceDuration == 0 {
 		return errors.New(ErrNoFilterCondition)
 	}
@@ -379,11 +380,13 @@ func setTags(req *TracesQueryRequest, condition *api.TraceQueryCondition) {
 
 // setDuration sets duration in the query condition
 func setDuration(req *TracesQueryRequest, condition *api.TraceQueryCondition, timeCtx TimeContext) {
-	if req.Duration != "" {
-		duration := ParseDurationWithContext(req.Duration, req.Cold, timeCtx)
+	if req.Start != "" || req.End != "" {
+		duration := BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, 60, timeCtx)
 		condition.QueryDuration = &duration
-	} else if req.TraceID == "" {
-		// If no duration and no traceId provided, set default duration (last 1 hour)
+		return
+	}
+	if req.TraceID == "" {
+		// If no time range and no traceId provided, set default duration (last 1 hour)
 		// SkyWalking OAP requires either queryDuration or traceId
 		defaultDuration := ParseDurationWithContext(DefaultTraceDuration, req.Cold, timeCtx)
 		condition.QueryDuration = &defaultDuration
@@ -718,11 +721,10 @@ Important Notes:
 - May have slower response times compared to hot storage queries
 - Use when trace data is not found in regular trace queries
 
-Duration Format:
-- Standard Go duration: "7d", "1h", "-30m", "2h30m"
-- Negative values mean "ago": "-7d" = 7 days ago to now
-- Positive values mean "from now": "2h" = now to 2 hours later
-- Legacy format: "6d", "12h" (backward compatible)
+Time Range Format:
+- Absolute time: "2023-01-01 12:00:00", "2023-01-01 12"
+- Relative time: "-30m" (30 minutes ago), "-1h" (1 hour ago), "now"
+- Step: "SECOND", "MINUTE", "HOUR", "DAY"
 
 Usage Scenarios:
 - Historical incident investigation
@@ -731,17 +733,24 @@ Usage Scenarios:
 - When hot storage queries return no results
 
 Examples:
-- {"trace_id": "abc123...", "duration": "7d"}: Search last 7 days of cold storage
-- {"trace_id": "abc123...", "duration": "-30m"}: Search from 30 minutes ago to now
-- {"trace_id": "abc123...", "duration": "1h", "view": "summary"}: Quick summary from last hour
-- {"trace_id": "abc123...", "duration": "2h30m", "view": "errors_only"}: Error analysis from last 2.5 hours`,
+- {"trace_id": "abc123...", "start": "-7d", "end": "now"}: Search last 7 days of cold storage
+- {"trace_id": "abc123...", "start": "-30m", "end": "now"}: Search from 30 minutes ago to now
+- {"trace_id": "abc123...", "start": "-1h", "end": "now", "view": "summary"}: Quick summary from last hour
+- {"trace_id": "abc123...", "start": "-2h30m", "end": "now", "view": "errors_only"}: Error analysis from last 2.5 hours`,
 	searchColdTrace,
 	mcp.WithTitleAnnotation("Search a cold trace by TraceId"),
 	mcp.WithString("trace_id", mcp.Required(),
 		mcp.Description(`The unique identifier of the trace to retrieve from cold storage. Use this when regular trace queries return no results.`),
 	),
-	mcp.WithString("duration", mcp.Required(),
-		mcp.Description(`Time duration for cold storage query. Examples: "7d" (last 7 days), "-30m" (last 30 minutes), "2h30m" (last 2.5 hours)`),
+	mcp.WithString("start",
+		mcp.Description(`Start time for cold storage query. Examples: "-7d", "2023-01-01 12:00:00"`),
+	),
+	mcp.WithString("end",
+		mcp.Description(`End time for cold storage query. Examples: "now", "2023-01-01 13:00:00"`),
+	),
+	mcp.WithString("step",
+		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
+		mcp.Description("Time step granularity. If not specified, uses adaptive sizing."),
 	),
 	mcp.WithString("view",
 		mcp.Enum(ViewFull, ViewSummary, ViewErrorsOnly),
@@ -760,7 +769,7 @@ var TracesQueryTool = NewTool[TracesQueryRequest, *mcp.CallToolResult](
 Workflow:
 1. Use this tool when you need to find traces matching specific criteria
 2. Specify one or more query conditions to narrow down results
-3. Use duration to limit the time range for the search
+3. Use start/end to limit the time range for the search
 4. Choose the appropriate view for your analysis needs
 
 Query Conditions:
@@ -768,7 +777,7 @@ Query Conditions:
 - service_instance_id: Filter by specific service instance
 - trace_id: Search for a specific trace ID
 - endpoint_id: Filter by specific endpoint
-- duration: Time range for the query (e.g., "1h", "7d", "-30m")
+- start/end: Time range for the query (e.g., start "-1h", end "now")
 - min_trace_duration/max_trace_duration: Filter by trace duration in milliseconds
 - trace_state: Filter by trace state (success, error, all)
 - query_order: Sort order (start_time, duration, start_time_desc, duration_desc)
@@ -777,8 +786,8 @@ Query Conditions:
 - tags: Filter by span tags (key-value pairs)
 
 Important Notes:
-- SkyWalking OAP requires either 'duration' or 'trace_id' to be specified
-- If neither is provided, a default duration of "1h" (last 1 hour) will be used
+- SkyWalking OAP requires either a time range or 'trace_id' to be specified
+- If no time range and no trace_id are provided, a default duration of "1h" (last 1 hour) will be used
 - This ensures the query always has a valid time range or specific trace to search
 
 View Options:
@@ -790,18 +799,18 @@ Best Practices:
 - Start with 'summary' view to get an intelligent overview
 - Use 'errors_only' view for focused troubleshooting
 - Combine multiple filters for precise results
-- Use duration to limit search scope and improve performance
+- Use time ranges to limit search scope and improve performance
 - Only set slow_trace_threshold when you need to identify performance issues
 - Use tags to filter traces by specific attributes or metadata
 
 Examples:
-- {"service_id": "Your_ApplicationName", "duration": "1h", "view": "summary"}: Recent traces summary with performance insights
-- {"trace_state": "error", "duration": "7d", "view": "errors_only"}: Error traces from last week for troubleshooting
+- {"service_id": "Your_ApplicationName", "start": "-1h", "end": "now", "view": "summary"}: Recent traces summary with performance insights
+- {"trace_state": "error", "start": "-7d", "end": "now", "view": "errors_only"}: Error traces from last week for troubleshooting
 - {"min_trace_duration": 1000, "query_order": "duration_desc", "view": "summary"}: Slow traces analysis with performance metrics
 - {"slow_trace_threshold": 5000, "view": "summary"}: Identify traces slower than 5 seconds
 - {"service_id": "Your_ApplicationName"}: Query with default 1-hour duration
 - {"tags": [{"key": "http.method", "value": "POST"}, {"key": "http.status_code", "value": "500"}], 
-  "duration": "1h"}: Find traces with specific HTTP tags`,
+	"start": "-1h", "end": "now"}: Find traces with specific HTTP tags`,
 	searchTraces,
 	mcp.WithTitleAnnotation("Query traces with intelligent analysis"),
 	mcp.WithString("service_id",
@@ -816,8 +825,15 @@ Examples:
 	mcp.WithString("endpoint_id",
 		mcp.Description("Endpoint ID to filter traces. Use this to find traces for a specific endpoint."),
 	),
-	mcp.WithString("duration",
-		mcp.Description(`Time duration for the query. Examples: "7d" (last 7 days), "-30m" (last 30 minutes), "2h30m" (last 2.5 hours)`),
+	mcp.WithString("start",
+		mcp.Description("Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)"),
+	),
+	mcp.WithString("end",
+		mcp.Description("End time for the query. Examples: \"2023-01-01 13:00:00\", \"now\", \"-10m\" (10 minutes ago)"),
+	),
+	mcp.WithString("step",
+		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
+		mcp.Description("Time step granularity. If not specified, uses adaptive sizing."),
 	),
 	mcp.WithNumber("min_trace_duration",
 		mcp.Description("Minimum trace duration in milliseconds. Use this to filter out fast traces."),

@@ -57,7 +57,6 @@ type SingleMetricsRequest struct {
 	DestServiceInstanceName string `json:"dest_service_instance_name,omitempty"`
 	DestEndpointName        string `json:"dest_endpoint_name,omitempty"`
 	DestProcessName         string `json:"dest_process_name,omitempty"`
-	Duration                string `json:"duration,omitempty"`
 	Start                   string `json:"start,omitempty"`
 	End                     string `json:"end,omitempty"`
 	Step                    string `json:"step,omitempty"`
@@ -75,7 +74,6 @@ type TopNMetricsRequest struct {
 	ServiceName   string `json:"service_name,omitempty"`
 	ParentService string `json:"parent_service,omitempty"`
 	Normal        bool   `json:"normal,omitempty"`
-	Duration      string `json:"duration,omitempty"`
 	Start         string `json:"start,omitempty"`
 	End           string `json:"end,omitempty"`
 	Step          string `json:"step,omitempty"`
@@ -227,12 +225,7 @@ func querySingleMetrics(ctx context.Context, req *SingleMetricsRequest) (*mcp.Ca
 	condition := buildMetricsCondition(req)
 	timeCtx := GetTimeContext(ctx)
 
-	var duration api.Duration
-	if req.Duration != "" {
-		duration = ParseDurationWithContext(req.Duration, req.Cold, timeCtx)
-	} else {
-		duration = BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, 0, timeCtx)
-	}
+	duration := BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, 0, timeCtx)
 
 	value, err := metrics.IntValues(ctx, *condition, duration)
 	if err != nil {
@@ -254,17 +247,7 @@ func queryTopNMetrics(ctx context.Context, req *TopNMetricsRequest) (*mcp.CallTo
 	condition := buildTopNCondition(req)
 	timeCtx := GetTimeContext(ctx)
 
-	// Set default duration if none provided
-	if req.Duration == "" && req.Start == "" && req.End == "" {
-		req.Duration = "30m"
-	}
-
-	var duration api.Duration
-	if req.Duration != "" {
-		duration = ParseDurationWithContext(req.Duration, req.Cold, timeCtx)
-	} else {
-		duration = BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, 0, timeCtx)
-	}
+	duration := BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, 0, timeCtx)
 
 	values, err := metrics.SortMetrics(ctx, *condition, duration)
 	if err != nil {
@@ -311,11 +294,11 @@ Time Format:
 - Step: "SECOND", "MINUTE", "HOUR", "DAY"
 
 Examples:
-- {"metrics_name": "service_cpm", "service_name": "business-zone::projectC", "duration": "-1h"}: Get calls per minute for a service in the past hour
+- {"metrics_name": "service_cpm", "service_name": "business-zone::projectC", "start": "-1h", "end": "now"}: Get calls per minute for a service in the past hour
 - {"metrics_name": "endpoint_cpm", "service_name": "business-zone::projectC", 
-  "endpoint_name": "/projectC/{value}", "duration": "-30m"}: Get calls per minute for a specific endpoint in the past 30 minutes
+	"endpoint_name": "/projectC/{value}", "start": "-30m", "end": "now"}: Get calls per minute for a specific endpoint in the past 30 minutes
 - {"metrics_name": "service_resp_time", "service_name": "web-service", 
-  "start": "-1h", "end": "now", "step": "MINUTE"}: Get service response time with custom time range
+	"start": "-1h", "end": "now", "step": "MINUTE"}: Get service response time with custom time range
 - {"metrics_name": "service_apdex", "service_name": "api-gateway", "cold": true}: Get Apdex score from cold storage`,
 	querySingleMetrics,
 	mcp.WithTitleAnnotation("Query single-value metrics"),
@@ -359,11 +342,6 @@ service_instance_sla, service_cpm, service_resp_time, service_apdex`),
 	),
 	mcp.WithString("dest_process_name",
 		mcp.Description("Destination process name for relationship metrics. Use this for process relation scopes."),
-	),
-	mcp.WithString("duration",
-		mcp.Description("Time duration for the query relative to current time. "+
-			"Negative values query the past: \"-1h\" (past 1 hour), \"-30m\" (past 30 minutes), \"-7d\" (past 7 days). "+
-			"Positive values query the future: \"1h\" (next 1 hour), \"24h\" (next 24 hours)"),
 	),
 	mcp.WithString("start",
 		mcp.Description("Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)"),
@@ -421,12 +399,12 @@ Time Format:
 - Step: "SECOND", "MINUTE", "HOUR", "DAY"
 
 Examples:
-- {"metrics_name": "service_sla", "top_n": 5, "duration": "-1h"}: Get top 5 services with highest SLA in the past hour
-- {"metrics_name": "endpoint_sla", "top_n": 10, "order": "ASC", "duration": "-30m"}: Get top 10 endpoints with lowest SLA in the past 30 minutes
+- {"metrics_name": "service_sla", "top_n": 5, "start": "-1h", "end": "now"}: Get top 5 services with highest SLA in the past hour
+- {"metrics_name": "endpoint_sla", "top_n": 10, "order": "ASC", "start": "-30m", "end": "now"}: Get top 10 endpoints with lowest SLA in the past 30 minutes
 - {"metrics_name": "service_instance_sla", "top_n": 3, "service_name": "boutique::adservice", 
-  "duration": "-1h"}: Get top 3 instances of a specific service with highest SLA in the past hour
+	"start": "-1h", "end": "now"}: Get top 3 instances of a specific service with highest SLA in the past hour
 - {"metrics_name": "service_cpm", "top_n": 5, "start": "-1h", "end": "now", 
-  "step": "MINUTE"}: Get top 5 services with highest calls per minute with custom time range`,
+	"step": "MINUTE"}: Get top 5 services with highest calls per minute with custom time range`,
 	queryTopNMetrics,
 	mcp.WithTitleAnnotation("Query top N metrics"),
 	mcp.WithString("metrics_name", mcp.Required(),
@@ -452,11 +430,6 @@ service_instance_sla, service_cpm, service_resp_time, service_apdex`),
 	),
 	mcp.WithString("service_name",
 		mcp.Description("Parent service name to filter metrics. Use this to get top N entities within a specific service."),
-	),
-	mcp.WithString("duration",
-		mcp.Description("Time duration for the query relative to current time. "+
-			"Negative values query the past: \"-1h\" (past 1 hour), \"-30m\" (past 30 minutes), \"-7d\" (past 7 days). "+
-			"Positive values query the future: \"1h\" (next 1 hour), \"24h\" (next 24 hours)"),
 	),
 	mcp.WithString("start",
 		mcp.Description("Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)"),

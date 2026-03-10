@@ -30,7 +30,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/viper"
-	api "skywalking.apache.org/repo/goapi/query"
 )
 
 // AddMQETools registers MQE-related tools with the MCP server
@@ -118,7 +117,6 @@ type MQEExpressionRequest struct {
 	DestEndpointName        string `json:"dest_endpoint_name,omitempty"`
 	DestProcessName         string `json:"dest_process_name,omitempty"`
 	DestNormal              *bool  `json:"dest_normal,omitempty"`
-	Duration                string `json:"duration,omitempty"`
 	Start                   string `json:"start,omitempty"`
 	End                     string `json:"end,omitempty"`
 	Step                    string `json:"step,omitempty"`
@@ -294,12 +292,7 @@ func executeMQEExpression(ctx context.Context, req *MQEExpressionRequest) (*mcp.
 	entity := buildMQEEntity(ctx, req)
 	timeCtx := GetTimeContext(ctx)
 
-	var duration api.Duration
-	if req.Duration != "" {
-		duration = ParseDurationWithContext(req.Duration, req.Cold, timeCtx)
-	} else {
-		duration = BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, DefaultDuration, timeCtx)
-	}
+	duration := BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, DefaultDuration, timeCtx)
 
 	// GraphQL query for MQE expression
 	query := `
@@ -479,7 +472,7 @@ USAGE REQUIREMENTS:
 - The 'expression' parameter is mandatory for all queries
 - For service-specific queries, specify 'service_name' and optionally 'layer' (defaults to GENERAL)
 - For relation metrics, provide both source and destination entity parameters
-- Either specify 'duration' OR both 'start' and 'end' for time range
+- Use 'start' and 'end' to set a time range; if omitted, defaults to the last 30 minutes
 - Use 'debug: true' for query tracing and troubleshooting
 - Use 'cold: true' to query from cold storage (BanyanDB only)
 
@@ -491,13 +484,13 @@ Entity Filtering (all optional):
 - Relation queries: dest_service_name + dest_layer, dest_service_instance_name, etc.
 
 Examples:
-- {expression: "service_sla * 100", service_name: "Your_ApplicationName", layer: "GENERAL", duration: "-1h"}: Convert SLA to percentage for last hour
+- {expression: "service_sla * 100", service_name: "Your_ApplicationName", layer: "GENERAL", start: "-1h", end: "now"}: Convert SLA to percentage for last hour
 - {expression: "service_resp_time > 3000 && service_cpm < 1000", service_name: "Your_ApplicationName", 
-  duration: "-30m"}: Find high latency with low traffic in last 30 minutes
-- {expression: "avg(service_cpm)", duration: "-2h"}: Calculate average CPM for last 2 hours
-- {expression: "service_cpm", duration: "24h"}: Query CPM for next 24 hours (useful for capacity planning)
+	start: "-30m", end: "now"}: Find high latency with low traffic in last 30 minutes
+- {expression: "avg(service_cpm)", start: "-2h", end: "now"}: Calculate average CPM for last 2 hours
+- {expression: "service_cpm", start: "now", end: "+24h"}: Query CPM for next 24 hours (useful for capacity planning)
 - {expression: "top_n(service_cpm, 10, des)", start: "2025-07-06 16:00:00", end: "2025-07-06 17:00:00", 
-  step: "MINUTE"}: Top 10 services by CPM with minute granularity`,
+	step: "MINUTE"}: Top 10 services by CPM with minute granularity`,
 	executeMQEExpression,
 	mcp.WithString("expression", mcp.Required(),
 		mcp.Description("MQE expression to execute (required). "+
@@ -521,11 +514,6 @@ Examples:
 	mcp.WithString("dest_endpoint_name", mcp.Description("Destination endpoint name for relation metrics")),
 	mcp.WithString("dest_process_name", mcp.Description("Destination process name for relation metrics")),
 	mcp.WithBoolean("dest_normal", mcp.Description("Whether the destination service is normal")),
-	mcp.WithString("duration",
-		mcp.Description("Time duration for the query relative to current time. "+
-			"Negative values query the past: `-1h` (past 1 hour), `-30m` (past 30 minutes), `-7d` (past 7 days). "+
-			"Positive values query the future: `1h` (next 1 hour), `24h` (next 24 hours). "+
-			"Use this OR specify both start+end")),
 	mcp.WithString("start", mcp.Description("Start time for the query. Examples: `2025-07-06 12:00:00`, `-1h` (1 hour ago), `-30m` (30 minutes ago)")),
 	mcp.WithString("end", mcp.Description("End time for the query. Examples: `2025-07-06 13:00:00`, `now`, `-10m` (10 minutes ago)")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY", "MONTH"),
