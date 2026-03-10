@@ -38,3 +38,5 @@
 .DS_Store
 coverage.txt
 target/
+inspector-config.json
+*.log
