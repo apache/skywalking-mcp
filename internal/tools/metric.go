@@ -225,12 +225,13 @@ func querySingleMetrics(ctx context.Context, req *SingleMetricsRequest) (*mcp.Ca
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	condition := buildMetricsCondition(req)
+	timeCtx := GetTimeContext(ctx)
 
 	var duration api.Duration
 	if req.Duration != "" {
-		duration = ParseDuration(req.Duration, req.Cold)
+		duration = ParseDurationWithContext(req.Duration, req.Cold, timeCtx)
 	} else {
-		duration = BuildDuration(req.Start, req.End, req.Step, req.Cold, 0)
+		duration = BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, 0, timeCtx)
 	}
 
 	value, err := metrics.IntValues(ctx, *condition, duration)
@@ -251,6 +252,7 @@ func queryTopNMetrics(ctx context.Context, req *TopNMetricsRequest) (*mcp.CallTo
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	condition := buildTopNCondition(req)
+	timeCtx := GetTimeContext(ctx)
 
 	// Set default duration if none provided
 	if req.Duration == "" && req.Start == "" && req.End == "" {
@@ -259,9 +261,9 @@ func queryTopNMetrics(ctx context.Context, req *TopNMetricsRequest) (*mcp.CallTo
 
 	var duration api.Duration
 	if req.Duration != "" {
-		duration = ParseDuration(req.Duration, req.Cold)
+		duration = ParseDurationWithContext(req.Duration, req.Cold, timeCtx)
 	} else {
-		duration = BuildDuration(req.Start, req.End, req.Step, req.Cold, 0)
+		duration = BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, 0, timeCtx)
 	}
 
 	values, err := metrics.SortMetrics(ctx, *condition, duration)

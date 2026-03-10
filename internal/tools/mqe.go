@@ -292,12 +292,13 @@ func executeMQEExpression(ctx context.Context, req *MQEExpressionRequest) (*mcp.
 	}
 
 	entity := buildMQEEntity(ctx, req)
+	timeCtx := GetTimeContext(ctx)
 
 	var duration api.Duration
 	if req.Duration != "" {
-		duration = ParseDuration(req.Duration, req.Cold)
+		duration = ParseDurationWithContext(req.Duration, req.Cold, timeCtx)
 	} else {
-		duration = BuildDuration(req.Start, req.End, req.Step, req.Cold, DefaultDuration)
+		duration = BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, DefaultDuration, timeCtx)
 	}
 
 	// GraphQL query for MQE expression

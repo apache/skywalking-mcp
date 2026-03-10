@@ -254,7 +254,8 @@ func searchColdTrace(ctx context.Context, req *ColdTraceRequest) (*mcp.CallToolR
 	}
 
 	// Parse duration string to api.Duration
-	duration := ParseDuration(req.Duration, true)
+	timeCtx := GetTimeContext(ctx)
+	duration := ParseDurationWithContext(req.Duration, true, timeCtx)
 
 	traces, err := trace.ColdTrace(ctx, duration, req.TraceID)
 	if err != nil {
@@ -377,14 +378,14 @@ func setTags(req *TracesQueryRequest, condition *api.TraceQueryCondition) {
 }
 
 // setDuration sets duration in the query condition
-func setDuration(req *TracesQueryRequest, condition *api.TraceQueryCondition) {
+func setDuration(req *TracesQueryRequest, condition *api.TraceQueryCondition, timeCtx TimeContext) {
 	if req.Duration != "" {
-		duration := ParseDuration(req.Duration, req.Cold)
+		duration := ParseDurationWithContext(req.Duration, req.Cold, timeCtx)
 		condition.QueryDuration = &duration
 	} else if req.TraceID == "" {
 		// If no duration and no traceId provided, set default duration (last 1 hour)
 		// SkyWalking OAP requires either queryDuration or traceId
-		defaultDuration := ParseDuration(DefaultTraceDuration, req.Cold)
+		defaultDuration := ParseDurationWithContext(DefaultTraceDuration, req.Cold, timeCtx)
 		condition.QueryDuration = &defaultDuration
 	}
 }
@@ -429,7 +430,7 @@ func setPagination(req *TracesQueryRequest, condition *api.TraceQueryCondition) 
 }
 
 // buildQueryCondition builds the query condition from request parameters
-func buildQueryCondition(req *TracesQueryRequest) (*api.TraceQueryCondition, error) {
+func buildQueryCondition(req *TracesQueryRequest, timeCtx TimeContext) (*api.TraceQueryCondition, error) {
 	condition := &api.TraceQueryCondition{
 		TraceState: api.TraceStateAll,         // Default to all traces
 		QueryOrder: api.QueryOrderByStartTime, // Default order
@@ -442,7 +443,7 @@ func buildQueryCondition(req *TracesQueryRequest) (*api.TraceQueryCondition, err
 	setTags(req, condition)
 
 	// Set duration
-	setDuration(req, condition)
+	setDuration(req, condition, timeCtx)
 
 	// Set trace state
 	if err := setTraceState(req, condition); err != nil {
@@ -472,7 +473,8 @@ func searchTraces(ctx context.Context, req *TracesQueryRequest) (*mcp.CallToolRe
 	}
 
 	// Build query condition
-	condition, err := buildQueryCondition(req)
+	timeCtx := GetTimeContext(ctx)
+	condition, err := buildQueryCondition(req, timeCtx)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}

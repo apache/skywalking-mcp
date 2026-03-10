@@ -40,3 +40,5 @@ coverage.txt
 target/
 inspector-config.json
 *.log
+.vscode/
+.claude/

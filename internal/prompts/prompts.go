@@ -140,6 +140,26 @@ func addTraceAnalysisPrompts(s *server.MCPServer) {
 }
 
 func addUtilityPrompts(s *server.MCPServer) {
+	// Service Topology Explorer
+	s.AddPrompt(mcp.Prompt{
+		Name:        "explore-service-topology",
+		Description: "Explore the service topology of a layer: list services, instances, endpoints, and processes within a time range",
+		Arguments: []mcp.PromptArgument{
+			{Name: "layer", Description: "The layer to explore (e.g. GENERAL, MESH, K8S). Use list_layers if unknown.", Required: true},
+			{Name: "start", Description: `Start time for the query. Examples: "2024-01-01 12:00:00", "-1h" (1 hour ago).`, Required: true},
+			{Name: "end", Description: `End time for the query. Examples: "2024-01-01 13:00:00", "now". Defaults to current time if omitted.`, Required: false},
+		},
+	}, exploreServiceTopologyHandler)
+
+	// Generate Duration Prompt
+	s.AddPrompt(mcp.Prompt{
+		Name:        "generate_duration",
+		Description: "Convert a natural-language time range into a {start, end} duration object for use with list_instances, list_endpoints, list_processes, and similar tools",
+		Arguments: []mcp.PromptArgument{
+			{Name: "time_range", Description: `Natural-language description of the desired time range. Examples: "last hour", "past 30 minutes", "yesterday 9am to 5pm", "2024-01-01 12:00 to 13:00"`, Required: true},
+		},
+	}, generateDurationHandler)
+
 	// MQE Query Builder Prompt
 	s.AddPrompt(mcp.Prompt{
 		Name:        "build-mqe-query",
@@ -609,6 +629,99 @@ Provide detailed trace analysis with specific optimization recommendations.`, tr
 
 	return &mcp.GetPromptResult{
 		Description: "Deep dive trace analysis",
+		Messages: []mcp.PromptMessage{
+			{
+				Role: mcp.RoleUser,
+				Content: mcp.TextContent{
+					Type: "text",
+					Text: prompt,
+				},
+			},
+		},
+	}, nil
+}
+
+func generateDurationHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	timeRange := request.Params.Arguments["time_range"]
+
+	prompt := fmt.Sprintf(`Convert the following time range description into a duration object with "start" and "end" fields.
+
+Time range: "%s"
+
+Rules:
+- "start" and "end" must be strings in one of these formats:
+  - Relative: "-30m" (30 minutes ago), "-1h" (1 hour ago), "-7d" (7 days ago)
+  - Absolute: "2024-01-01 12:00:00" (YYYY-MM-DD HH:MM:SS)
+- If the end of the range is the current time, set "end" to "now"
+- Relative values are always negative (e.g. "-1h", not "1h")
+
+Output only a JSON object, for example:
+{"start": "-1h", "end": "now"}
+
+This duration can be passed directly to tools such as list_instances, list_endpoints, and list_processes.`, timeRange)
+
+	return &mcp.GetPromptResult{
+		Description: "Generate a {start, end} duration object from a natural-language time range",
+		Messages: []mcp.PromptMessage{
+			{
+				Role:    mcp.RoleUser,
+				Content: mcp.TextContent{Type: "text", Text: prompt},
+			},
+		},
+	}, nil
+}
+
+func exploreServiceTopologyHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	args := request.Params.Arguments
+	layer := args["layer"]
+	start := args["start"]
+	end := args["end"]
+
+	if end == "" {
+		end = "now"
+	}
+
+	prompt := fmt.Sprintf(`Explore the service topology of layer "%s" within the time range from "%s" to "%s".
+
+**Workflow:**
+
+**Step 1 – Discover services**
+- Use list_services with layer="%s" to get all services in this layer
+- Note the id of each service for the next steps
+
+**Step 2 – List instances per service**
+- For each service of interest, use list_instances with:
+  - service_id: <id from step 1>
+  - start: "%s"
+  - end: "%s"
+- Review instance names, languages, and attributes
+
+**Step 3 – List endpoints per service**
+- Use list_endpoints with:
+  - service_id: <id from step 1>
+  - start: "%s"
+  - end: "%s"
+- Note endpoint ids for use in metrics or trace queries
+
+**Step 4 – List processes per instance**
+- For each instance of interest, use list_processes with:
+  - instance_id: <id from step 2>
+  - start: "%s"
+  - end: "%s"
+- Review process names, detect types, and labels
+
+**Summary to provide:**
+- Total number of services, instances, endpoints, and processes found
+- Any notable attributes or labels worth highlighting
+- Suggested follow-up queries (e.g. metrics, traces, logs) for specific services or instances`,
+		layer, start, end,
+		layer,
+		start, end,
+		start, end,
+		start, end)
+
+	return &mcp.GetPromptResult{
+		Description: "Service topology exploration",
 		Messages: []mcp.PromptMessage{
 			{
 				Role: mcp.RoleUser,

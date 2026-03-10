@@ -54,8 +54,8 @@ type LogQueryRequest struct {
 }
 
 // buildLogQueryCondition builds the log query condition from request parameters
-func buildLogQueryCondition(req *LogQueryRequest) *api.LogQueryCondition {
-	duration := BuildDuration(req.Start, req.End, req.Step, req.Cold, DefaultDuration)
+func buildLogQueryCondition(req *LogQueryRequest, timeCtx TimeContext) *api.LogQueryCondition {
+	duration := BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, DefaultDuration, timeCtx)
 
 	var tags []*api.LogTag
 	for _, t := range req.Tags {
@@ -82,7 +82,8 @@ func buildLogQueryCondition(req *LogQueryRequest) *api.LogQueryCondition {
 
 // queryLogs queries logs from SkyWalking OAP
 func queryLogs(ctx context.Context, req *LogQueryRequest) (*mcp.CallToolResult, error) {
-	cond := buildLogQueryCondition(req)
+	timeCtx := GetTimeContext(ctx)
+	cond := buildLogQueryCondition(req, timeCtx)
 
 	logs, err := swlog.Logs(ctx, cond)
 	if err != nil {

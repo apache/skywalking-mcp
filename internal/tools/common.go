@@ -18,10 +18,13 @@
 package tools
 
 import (
+	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/apache/skywalking-cli/pkg/graphql/metadata"
 	api "skywalking.apache.org/repo/goapi/query"
 )
 
@@ -63,25 +66,88 @@ func FormatTimeByStep(t time.Time, step api.Step) string {
 	}
 }
 
+// TimeContext provides server-aware time data for duration calculations.
+type TimeContext struct {
+	NowUTC   time.Time
+	Location *time.Location
+}
+
+// NewTimeContext builds a time context from server TimeInfo, falling back to local UTC.
+func NewTimeContext(timeInfo *api.TimeInfo) TimeContext {
+	nowUTC := time.Now().UTC()
+	location := time.UTC
+
+	if timeInfo != nil {
+		if timeInfo.CurrentTimestamp != nil {
+			nowUTC = time.UnixMilli(*timeInfo.CurrentTimestamp).UTC()
+		}
+		if timeInfo.Timezone != nil {
+			if loc, ok := parseTimezoneOffset(*timeInfo.Timezone); ok {
+				location = loc
+			}
+		}
+	}
+
+	return TimeContext{
+		NowUTC:   nowUTC,
+		Location: location,
+	}
+}
+
+// GetTimeContext fetches server time info and builds a time context.
+func GetTimeContext(ctx context.Context) TimeContext {
+	info, err := metadata.ServerTimeInfo(ctx)
+	if err != nil {
+		return NewTimeContext(nil)
+	}
+	return NewTimeContext(&info)
+}
+
+func parseTimezoneOffset(offset string) (*time.Location, bool) {
+	if len(offset) != 5 || (offset[0] != '+' && offset[0] != '-') {
+		return nil, false
+	}
+
+	hours, err := strconv.Atoi(offset[1:3])
+	if err != nil {
+		return nil, false
+	}
+	minutes, err := strconv.Atoi(offset[3:5])
+	if err != nil {
+		return nil, false
+	}
+
+	totalSeconds := hours*3600 + minutes*60
+	if offset[0] == '-' {
+		totalSeconds = -totalSeconds
+	}
+
+	return time.FixedZone(offset, totalSeconds), true
+}
+
 // ParseDuration converts duration string to api.Duration
 func ParseDuration(durationStr string, coldStage bool) api.Duration {
-	now := time.Now()
+	return ParseDurationWithContext(durationStr, coldStage, NewTimeContext(nil))
+}
+
+// ParseDurationWithContext converts duration string to api.Duration using server time context.
+func ParseDurationWithContext(durationStr string, coldStage bool, timeCtx TimeContext) api.Duration {
 	var startTime, endTime time.Time
 	var step api.Step
 
 	duration, err := time.ParseDuration(durationStr)
 	if err == nil {
 		if duration < 0 {
-			startTime = now.Add(duration)
-			endTime = now
+			startTime = timeCtx.NowUTC.Add(duration)
+			endTime = timeCtx.NowUTC
 		} else {
-			startTime = now
-			endTime = now.Add(duration)
+			startTime = timeCtx.NowUTC
+			endTime = timeCtx.NowUTC.Add(duration)
 		}
 		// Use adaptive step based on time range
 		step = determineAdaptiveStep(startTime, endTime)
 	} else {
-		startTime, endTime, step = parseLegacyDuration(durationStr)
+		startTime, endTime, step = parseLegacyDuration(durationStr, timeCtx.NowUTC)
 	}
 
 	if !step.IsValid() {
@@ -112,10 +178,15 @@ func BuildPagination(pageNum, pageSize int) *api.Pagination {
 
 // BuildDuration creates duration from parameters
 func BuildDuration(start, end, step string, cold bool, defaultDurationMinutes int) api.Duration {
+	return BuildDurationWithContext(start, end, step, cold, defaultDurationMinutes, NewTimeContext(nil))
+}
+
+// BuildDurationWithContext creates duration from parameters using server time context.
+func BuildDurationWithContext(start, end, step string, cold bool, defaultDurationMinutes int, timeCtx TimeContext) api.Duration {
 	if start != "" || end != "" {
 		stepEnum := api.Step(step)
 		// Parse and format start and end times
-		startTime, endTime := parseStartEndTimes(start, end)
+		startTime, endTime := parseStartEndTimes(start, end, timeCtx)
 
 		// If step is not provided or invalid, determine it adaptively based on time range
 		if step == "" || !stepEnum.IsValid() {
@@ -134,7 +205,7 @@ func BuildDuration(start, end, step string, cold bool, defaultDurationMinutes in
 		defaultDurationMinutes = DefaultDuration
 	}
 	defaultDurationStr := fmt.Sprintf("-%dm", defaultDurationMinutes)
-	return ParseDuration(defaultDurationStr, cold)
+	return ParseDurationWithContext(defaultDurationStr, cold, timeCtx)
 }
 
 // determineAdaptiveStep determines the adaptive step based on the time range
@@ -152,8 +223,7 @@ func determineAdaptiveStep(startTime, endTime time.Time) api.Step {
 }
 
 // parseLegacyDuration parses legacy duration strings like "7d", "24h"
-func parseLegacyDuration(durationStr string) (startTime, endTime time.Time, step api.Step) {
-	now := time.Now()
+func parseLegacyDuration(durationStr string, now time.Time) (startTime, endTime time.Time, step api.Step) {
 	if len(durationStr) > 1 && (durationStr[len(durationStr)-1] == 'd' || durationStr[len(durationStr)-1] == 'D') {
 		var days int
 		if _, parseErr := fmt.Sscanf(durationStr[:len(durationStr)-1], "%d", &days); parseErr == nil && days > 0 {
@@ -187,7 +257,7 @@ func parseLegacyDuration(durationStr string) (startTime, endTime time.Time, step
 }
 
 // parseAbsoluteTime tries to parse absolute time in various formats
-func parseAbsoluteTime(timeStr string) (time.Time, bool) {
+func parseAbsoluteTime(timeStr string, location *time.Location) (time.Time, bool) {
 	timeFormats := []string{
 		"2006-01-02 15:04:05",
 		"2006-01-02 15:04",
@@ -198,7 +268,7 @@ func parseAbsoluteTime(timeStr string) (time.Time, bool) {
 	}
 
 	for _, format := range timeFormats {
-		if parsed, err := time.Parse(format, timeStr); err == nil {
+		if parsed, err := time.ParseInLocation(format, timeStr, location); err == nil {
 			return parsed, true
 		}
 	}
@@ -207,8 +277,8 @@ func parseAbsoluteTime(timeStr string) (time.Time, bool) {
 }
 
 // parseTimeString parses a time string (start or end)
-func parseTimeString(timeStr string, defaultTime time.Time) time.Time {
-	now := time.Now()
+func parseTimeString(timeStr string, defaultTime time.Time, timeCtx TimeContext) time.Time {
+	now := timeCtx.NowUTC
 
 	if timeStr == "" {
 		return defaultTime
@@ -224,20 +294,20 @@ func parseTimeString(timeStr string, defaultTime time.Time) time.Time {
 	}
 
 	// Try absolute time
-	if parsed, ok := parseAbsoluteTime(timeStr); ok {
-		return parsed
+	if parsed, ok := parseAbsoluteTime(timeStr, timeCtx.Location); ok {
+		return parsed.In(time.UTC)
 	}
 
 	return defaultTime
 }
 
 // parseStartEndTimes parses start and end time strings
-func parseStartEndTimes(start, end string) (startTime, endTime time.Time) {
-	now := time.Now()
+func parseStartEndTimes(start, end string, timeCtx TimeContext) (startTime, endTime time.Time) {
+	now := timeCtx.NowUTC
 	defaultStart := now.Add(-30 * time.Minute) // Default to 30 minutes ago
 
-	startTime = parseTimeString(start, defaultStart)
-	endTime = parseTimeString(end, now)
+	startTime = parseTimeString(start, defaultStart, timeCtx)
+	endTime = parseTimeString(end, now, timeCtx)
 
 	return startTime, endTime
 }
