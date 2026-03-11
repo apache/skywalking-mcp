@@ -46,7 +46,6 @@ func newMcpServer() *server.MCPServer {
 
 	// add tools and capabilities to the MCP server
 	tools.AddTraceTools(mcpServer)
-	tools.AddMetricsTools(mcpServer)
 	tools.AddLogTools(mcpServer)
 	tools.AddMQETools(mcpServer)
 	tools.AddMetadataTools(mcpServer)

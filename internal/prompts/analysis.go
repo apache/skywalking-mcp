@@ -43,17 +43,17 @@ func performanceAnalysisHandler(_ context.Context, request mcp.GetPromptRequest)
 **Analysis Required:**
 
 **Response Time Analysis**
-- Use query_single_metrics with metrics_name="service_resp_time" to get average response time
+- Use execute_mqe_expression with expression="service_resp_time" to get average response time
 - Use execute_mqe_expression with expression="service_percentile{p='50,75,90,95,99'}" to get percentiles
 - Identify trends and anomalies
 
 **Success Rate and SLA**
-- Use execute_mqe_expression with expression="service_sla * 100" to get success rate percentage
-- Use query_single_metrics with metrics_name="service_apdex" for user satisfaction score
+- Use execute_mqe_expression with expression="service_sla / 100" to get success rate percentage
+- Use execute_mqe_expression with expression="service_apdex / 10000" for user satisfaction score
 - Track SLA compliance over time
 
 **Traffic Analysis**
-- Use query_single_metrics with metrics_name="service_cpm" to get calls per minute
+- Use execute_mqe_expression with expression="service_cpm" to get calls per minute
 - Identify traffic patterns and peak periods
 
 **Error Analysis**
@@ -61,8 +61,8 @@ func performanceAnalysisHandler(_ context.Context, request mcp.GetPromptRequest)
 - Identify most common error types and affected endpoints
 
 **Performance Bottlenecks**
-- Use query_top_n_metrics with metrics_name="endpoint_resp_time" and order="DES" to find slowest endpoints
-- Use query_top_n_metrics with metrics_name="endpoint_cpm" to find high-traffic endpoints
+- Use execute_mqe_expression with expression="top_n(endpoint_resp_time, 5, DES)" to find slowest endpoints
+- Use execute_mqe_expression with expression="top_n(endpoint_cpm, 5, DES)" to find high-traffic endpoints
 
 Please provide actionable insights and specific recommendations based on the data.`, serviceName, duration, toolInstructions)
 
@@ -195,14 +195,10 @@ func topServicesHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.G
 		order = "DES"
 	}
 
-	prompt := fmt.Sprintf(`Find top services using query_top_n_metrics tool:
+	prompt := fmt.Sprintf(`Find top services using execute_mqe_expression tool:
 
 **Tool Configuration:**
-- query_top_n_metrics with parameters:
-  - metrics_name: "%s"
-  - top_n: %s
-  - order: "%s" (DES for highest, ASC for lowest)
-  - duration: "-1h" (or specify custom range)
+- execute_mqe_expression with expression: "top_n(%s, %s, %s)"
 
 **Analysis Focus:**
 
@@ -222,9 +218,8 @@ func topServicesHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.G
 - Performance optimization targets
 
 **Follow-up Analysis**
-- Use query_single_metrics for detailed service analysis
 - Use query_traces for error investigation
-- Use execute_mqe_expression for complex calculations
+- Use execute_mqe_expression for additional metric analysis
 
 Provide ranked results with specific recommendations.`, metricName, topN, order, topN, metricName)
 

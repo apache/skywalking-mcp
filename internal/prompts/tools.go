@@ -22,8 +22,6 @@ import "fmt"
 // Tool capability mapping for different analysis types
 var toolCapabilities = map[string][]string{
 	"performance_analysis": {
-		"query_single_metrics",
-		"query_top_n_metrics",
 		"execute_mqe_expression",
 	},
 	"trace_investigation": {
@@ -38,8 +36,6 @@ var toolCapabilities = map[string][]string{
 		"get_mqe_metric_type",
 	},
 	"service_comparison": {
-		"query_single_metrics",
-		"query_top_n_metrics",
 		"execute_mqe_expression",
 	},
 	"metrics_exploration": {
@@ -54,9 +50,7 @@ var analysisChains = map[string][]struct {
 	Purpose string
 }{
 	"performance_analysis": {
-		{Tool: "query_single_metrics", Purpose: "Get basic metrics like CPM, SLA, response time"},
-		{Tool: "execute_mqe_expression", Purpose: "Calculate derivatives like SLA percentage, percentiles"},
-		{Tool: "query_top_n_metrics", Purpose: "Identify top endpoints by response time or traffic"},
+		{Tool: "execute_mqe_expression", Purpose: "Query metrics like CPM, SLA, response time, percentiles, and top entities"},
 		{Tool: "query_traces", Purpose: "Find error traces for deeper investigation"},
 	},
 	"trace_investigation": {
