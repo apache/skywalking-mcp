@@ -675,7 +675,7 @@ func filterErrorTraces(traces *api.TraceBrief) []BasicTraceSummary {
 }
 
 // SearchTraceTool is a tool for searching traces by trace ID with different views
-var SearchTraceTool = NewTool[TraceRequest, *mcp.CallToolResult](
+var SearchTraceTool = NewTool(
 	"get_trace_details",
 	`This tool provides detailed information about a distributed trace from SkyWalking OAP.
 
@@ -711,7 +711,7 @@ Examples:
 )
 
 // ColdTraceTool is a tool for searching traces from cold storage by trace ID with different views
-var ColdTraceTool = NewTool[ColdTraceRequest, *mcp.CallToolResult](
+var ColdTraceTool = NewTool(
 	"get_cold_trace_details",
 	`This tool queries BanyanDB cold storage for historical trace data that may no longer be available in hot storage.
 
@@ -762,7 +762,7 @@ Examples:
 )
 
 // TracesQueryTool is a tool for querying traces with various conditions
-var TracesQueryTool = NewTool[TracesQueryRequest, *mcp.CallToolResult](
+var TracesQueryTool = NewTool(
 	"query_traces",
 	`This tool queries traces from SkyWalking OAP based on various conditions and provides intelligent data processing for LLM analysis.
 

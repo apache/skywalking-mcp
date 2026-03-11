@@ -261,7 +261,7 @@ func queryTopNMetrics(ctx context.Context, req *TopNMetricsRequest) (*mcp.CallTo
 }
 
 // SingleMetricsTool is a tool for querying single-value metrics
-var SingleMetricsTool = NewTool[SingleMetricsRequest, *mcp.CallToolResult](
+var SingleMetricsTool = NewTool(
 	"query_single_metrics",
 	`This tool queries single-value metrics defined in backend OAL from SkyWalking OAP.
 
@@ -365,7 +365,7 @@ SECOND (<1h), MINUTE (1h-24h), HOUR (1d-7d), DAY (>7d)`),
 )
 
 // TopNMetricsTool is a tool for querying top N metrics
-var TopNMetricsTool = NewTool[TopNMetricsRequest, *mcp.CallToolResult](
+var TopNMetricsTool = NewTool(
 	"query_top_n_metrics",
 	`This tool queries the top N entities sorted by the specified metrics from SkyWalking OAP.
 

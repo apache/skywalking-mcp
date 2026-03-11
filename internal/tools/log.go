@@ -113,7 +113,7 @@ func queryLogs(ctx context.Context, req *LogQueryRequest) (*mcp.CallToolResult, 
 	return mcp.NewToolResultText(string(jsonBytes)), nil
 }
 
-var LogQueryTool = NewTool[LogQueryRequest, *mcp.CallToolResult](
+var LogQueryTool = NewTool(
 	"query_logs",
 	`Query logs from SkyWalking OAP with flexible filters.
 

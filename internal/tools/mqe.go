@@ -443,7 +443,7 @@ func getMQEMetricsType(ctx context.Context, req *MQEMetricsTypeRequest) (*mcp.Ca
 	return mcp.NewToolResultText(string(jsonBytes)), nil
 }
 
-var MQEExpressionTool = NewTool[MQEExpressionRequest, *mcp.CallToolResult](
+var MQEExpressionTool = NewTool(
 	"execute_mqe_expression",
 	`Execute MQE (Metrics Query Expression) to query and calculate metrics data.
 
@@ -527,7 +527,7 @@ Examples:
 	mcp.WithBoolean("dump_db_rsp", mcp.Description("Dump database response for debugging")),
 )
 
-var MQEMetricsListTool = NewTool[MQEMetricsListRequest, *mcp.CallToolResult](
+var MQEMetricsListTool = NewTool(
 	"list_mqe_metrics",
 	`List available metrics in SkyWalking that can be used in MQE expressions.
 
@@ -562,7 +562,7 @@ Examples:
 	mcp.WithString("regex", mcp.Description("Optional regex pattern to filter metrics by name. Examples: `service_.*`, `.*_cpm`, `endpoint_.*`")),
 )
 
-var MQEMetricsTypeTool = NewTool[MQEMetricsTypeRequest, *mcp.CallToolResult](
+var MQEMetricsTypeTool = NewTool(
 	"get_mqe_metric_type",
 	`Get type information for a specific metric.
 
