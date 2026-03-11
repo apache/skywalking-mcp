@@ -51,6 +51,7 @@ func newMcpServer() *server.MCPServer {
 	tools.AddMQETools(mcpServer)
 	tools.AddMetadataTools(mcpServer)
 	tools.AddEventTools(mcpServer)
+	tools.AddAlarmTools(mcpServer)
 
 	// add MQE documentation resources
 	resources.AddMQEResources(mcpServer)
