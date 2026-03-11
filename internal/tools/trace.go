@@ -84,7 +84,7 @@ query ($condition: TraceQueryCondition) {
 				logs { time data { key value } }
 				attachedEvents {
 					startTime { seconds nanos } event endTime { seconds nanos }
-					tags { key value } summary { name value }
+					tags { key value } summary { key value }
 				}
 			}
 		}
