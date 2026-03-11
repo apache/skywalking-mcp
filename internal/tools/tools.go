@@ -48,7 +48,7 @@ func NewTool[T any, R any](
 
 // Register registers the tool with the given MCP server.
 func (t *Tool[T, R]) Register(server *server.MCPServer) {
-	tool, handler, err := ConvertTool[T, R](t.Name, t.Description, t.Handler, t.Options...)
+	tool, handler, err := ConvertTool(t.Name, t.Description, t.Handler, t.Options...)
 	if err != nil {
 		panic(err)
 	}
