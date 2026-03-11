@@ -52,7 +52,7 @@ func traceInvestigationHandler(_ context.Context, request mcp.GetPromptRequest) 
 - Note trace IDs that need deeper investigation
 
 **Deep Dive on Specific Traces**
-- Use get_trace_details with identified trace_id
+- Use query_traces with the identified trace_id
 - Start with view="summary" for quick insights
 - Use view="full" for complete span analysis
 - Use view="errors_only" if focusing on errors
@@ -66,10 +66,6 @@ func traceInvestigationHandler(_ context.Context, request mcp.GetPromptRequest) 
 - Use query_traces with trace_state="error"
 - Group errors by type and service
 - Identify error propagation paths
-
-**Historical Investigation**
-- If recent data shows no issues, use cold storage tools
-- Use get_cold_trace_details for older trace data
 
 Provide specific findings and actionable recommendations.`, serviceID, traceState, duration, toolInstructions)
 
@@ -153,7 +149,6 @@ func traceDeepDiveHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp
 	args := request.Params.Arguments
 	traceID := args["trace_id"]
 	view := args["view"]
-	checkColdStorage := args["check_cold_storage"]
 
 	if view == "" {
 		view = "summary"
@@ -162,17 +157,10 @@ func traceDeepDiveHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp
 	prompt := fmt.Sprintf(`Perform deep dive analysis of trace %s:
 
 **Primary Analysis:**
-- get_trace_details with trace_id: "%s" and view: "%s"
+- Use query_traces with trace_id: "%s" and view: "%s"
 - Start with summary view for quick insights
 - Use full view for complete span analysis
 - Use errors_only view if trace has errors
-
-**Cold Storage Check:**
-- If trace not found in hot storage and check_cold_storage is "%s"
-- Use get_cold_trace_details with same trace_id
-- Check historical data for older traces
-
-**Analysis Depth:**
 
 **Trace Structure Analysis**
 - Service call flow and dependencies
@@ -197,7 +185,7 @@ func traceDeepDiveHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp
 - Parallel processing potential
 - Database query optimization
 
-Provide detailed trace analysis with specific optimization recommendations.`, traceID, traceID, view, checkColdStorage)
+Provide detailed trace analysis with specific optimization recommendations.`, traceID, traceID, view)
 
 	return &mcp.GetPromptResult{
 		Description: "Deep dive trace analysis",

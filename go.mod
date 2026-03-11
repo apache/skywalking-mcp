@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/apache/skywalking-cli v0.0.0-20250604010708-77b4c49e89c9
+	github.com/machinebox/graphql v0.2.2
 	github.com/mark3labs/mcp-go v0.45.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
@@ -19,7 +20,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
-	github.com/machinebox/graphql v0.2.2 // indirect
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

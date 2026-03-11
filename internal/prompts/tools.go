@@ -28,8 +28,6 @@ var toolCapabilities = map[string][]string{
 	},
 	"trace_investigation": {
 		"query_traces",
-		"get_trace_details",
-		"get_cold_trace_details",
 	},
 	"log_analysis": {
 		"query_logs",
@@ -62,9 +60,7 @@ var analysisChains = map[string][]struct {
 		{Tool: "query_traces", Purpose: "Find error traces for deeper investigation"},
 	},
 	"trace_investigation": {
-		{Tool: "query_traces", Purpose: "Search for traces with specific filters"},
-		{Tool: "get_trace_details", Purpose: "Analyze individual traces in detail"},
-		{Tool: "get_cold_trace_details", Purpose: "Check historical traces if not found in hot storage"},
+		{Tool: "query_traces", Purpose: "Search for traces with specific filters and analyze results"},
 	},
 	"log_analysis": {
 		{Tool: "query_logs", Purpose: "Search and analyze log entries with filters"},

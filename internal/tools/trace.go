@@ -23,20 +23,17 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
-	"time"
 
+	"github.com/machinebox/graphql"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	api "skywalking.apache.org/repo/goapi/query"
 
-	"github.com/apache/skywalking-cli/pkg/graphql/trace"
+	"github.com/apache/skywalking-cli/pkg/graphql/client"
 )
 
 // AddTraceTools registers trace-related tools with the MCP server
 func AddTraceTools(mcp *server.MCPServer) {
-	SearchTraceTool.Register(mcp)
-	ColdTraceTool.Register(mcp)
 	TracesQueryTool.Register(mcp)
 }
 
@@ -62,43 +59,53 @@ const (
 
 // Error constants
 const (
-	ErrMissingTraceID         = "missing required parameter: trace_id"
-	ErrFailedToQueryTrace     = "failed to query trace '%s': %v"
-	ErrFailedToQueryColdTrace = "failed to query cold trace '%s': %v"
-	ErrFailedToQueryTraces    = "failed to query traces: %v"
+	ErrFailedToQueryTraces  = "failed to query traces: %v"
 	ErrNoFilterCondition      = "at least one filter condition must be provided"
 	ErrInvalidDurationRange   = "invalid duration range: min_duration (%d) > max_duration (%d)"
 	ErrNegativePageSize       = "page_size cannot be negative"
 	ErrNegativePageNum        = "page_num cannot be negative"
 	ErrInvalidTraceState      = "invalid trace_state '%s', available states: %s, %s, %s"
 	ErrInvalidQueryOrder      = "invalid query_order '%s', available orders: %s, %s"
-	ErrTraceNotFound          = "trace with ID '%s' not found"
-	ErrInvalidView            = "invalid view '%s', available views: %s, %s, %s"
+	ErrInvalidView = "invalid view '%s', available views: %s, %s, %s"
 	ErrNoTracesFound          = "no traces found matching the query criteria"
 )
 
-const TimeFormatFull = "2006-01-02 15:04:05"
+// queryTracesV2GQL is the GraphQL query for the trace-v2 protocol
+const queryTracesV2GQL = `
+query ($condition: TraceQueryCondition) {
+	result: queryTraces(condition: $condition) {
+		traces {
+			spans {
+				traceId segmentId spanId parentSpanId
+				refs { traceId parentSegmentId parentSpanId type }
+				serviceCode serviceInstanceName
+				startTime endTime endpointName type peer component isError layer
+				tags { key value }
+				logs { time data { key value } }
+				attachedEvents {
+					startTime { seconds nanos } event endTime { seconds nanos }
+					tags { key value } summary { name value }
+				}
+			}
+		}
+		retrievedTimeRange { startTime endTime }
+	}
+}`
+
+// tracesV2 queries traces using the queryTraces (v2) protocol
+func tracesV2(ctx context.Context, condition *api.TraceQueryCondition) (api.TraceList, error) {
+	var response map[string]api.TraceList
+	request := graphql.NewRequest(queryTracesV2GQL)
+	request.Var("condition", condition)
+	err := client.ExecuteQuery(ctx, request, &response)
+	return response["result"], err
+}
 
 // Trace-specific constants
 const (
 	DefaultTracePageSize = 20
 	DefaultTraceDuration = "1h"
 )
-
-// TraceRequest defines the parameters for the trace tool
-type TraceRequest struct {
-	TraceID string `json:"trace_id"`
-	View    string `json:"view,omitempty"`
-}
-
-// ColdTraceRequest defines the parameters for the cold trace tool
-type ColdTraceRequest struct {
-	TraceID string `json:"trace_id"`
-	Start   string `json:"start,omitempty"`
-	End     string `json:"end,omitempty"`
-	Step    string `json:"step,omitempty"`
-	View    string `json:"view,omitempty"`
-}
 
 // SpanTag represents a span tag for filtering traces
 type SpanTag struct {
@@ -125,19 +132,6 @@ type TracesQueryRequest struct {
 	SlowTraceThreshold int64     `json:"slow_trace_threshold,omitempty"`
 	Tags               []SpanTag `json:"tags,omitempty"`
 	Cold               bool      `json:"cold,omitempty"`
-}
-
-// TraceSummary provides a high-level overview of a trace
-type TraceSummary struct {
-	TraceID       string   `json:"trace_id"`
-	TotalSpans    int      `json:"total_spans"`
-	Services      []string `json:"services"`
-	TotalDuration int64    `json:"total_duration_ms"`
-	ErrorCount    int      `json:"error_count"`
-	HasErrors     bool     `json:"has_errors"`
-	RootEndpoint  string   `json:"root_endpoint"`
-	StartTime     int64    `json:"start_time_ms"`
-	EndTime       int64    `json:"end_time_ms"`
 }
 
 // TracesSummary provides a high-level overview of multiple traces
@@ -173,146 +167,51 @@ type TimeRange struct {
 	Duration  int64 `json:"duration_ms"`
 }
 
-// createBasicTraceSummary creates a BasicTraceSummary from trace item data
-func createBasicTraceSummary(traceItem *api.BasicTrace, startTimeMs, duration int64, isError bool) BasicTraceSummary {
-	return BasicTraceSummary{
-		TraceID:      traceItem.TraceIds[0], // Use first trace ID
-		ServiceName:  traceItem.SegmentID,   // Use segment ID as service name
-		EndpointName: strings.Join(traceItem.EndpointNames, ", "),
-		StartTime:    startTimeMs,
-		Duration:     duration,
-		IsError:      isError,
-		SpanCount:    0, // BasicTrace doesn't have span count
+// createBasicTraceSummary creates a BasicTraceSummary from a TraceV2
+func createBasicTraceSummary(traceItem *api.TraceV2) BasicTraceSummary {
+	if traceItem == nil || len(traceItem.Spans) == 0 {
+		return BasicTraceSummary{}
 	}
-}
-
-// processTraceResult handles the common logic for processing trace results
-func processTraceResult(traceID string, traceData *api.Trace, view string) (*mcp.CallToolResult, error) {
-	if len(traceData.Spans) == 0 {
-		return mcp.NewToolResultError(fmt.Sprintf(ErrTraceNotFound, traceID)), nil
-	}
-
-	var result interface{}
-	switch view {
-	case ViewSummary:
-		result = generateTraceSummary(traceID, traceData)
-	case ViewErrorsOnly:
-		result = filterErrorSpans(traceData)
-	case ViewFull:
-		result = traceData
-	default:
-		return mcp.NewToolResultError(fmt.Sprintf(ErrInvalidView, view, ViewFull, ViewSummary, ViewErrorsOnly)), nil
-	}
-
-	jsonBytes, err := json.Marshal(result)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(ErrMarshalFailed, err)), nil
-	}
-	return mcp.NewToolResultText(string(jsonBytes)), nil
-}
-
-// validateTraceRequest validates trace request parameters
-func validateTraceRequest(req TraceRequest) error {
-	if req.TraceID == "" {
-		return errors.New(ErrMissingTraceID)
-	}
-	return nil
-}
-
-// validateColdTraceRequest validates cold trace request parameters
-func validateColdTraceRequest(req ColdTraceRequest) error {
-	if req.TraceID == "" {
-		return errors.New(ErrMissingTraceID)
-	}
-	return nil
-}
-
-// searchTrace fetches the trace data and processes it based on the requested view
-func searchTrace(ctx context.Context, req *TraceRequest) (*mcp.CallToolResult, error) {
-	if err := validateTraceRequest(*req); err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	if req.View == "" {
-		req.View = ViewFull // Set default value
-	}
-
-	traces, err := trace.Trace(ctx, req.TraceID)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(ErrFailedToQueryTrace, req.TraceID, err)), nil
-	}
-	traceData := &traces
-
-	return processTraceResult(req.TraceID, traceData, req.View)
-}
-
-// searchColdTrace fetches the trace data from cold storage and processes it based on the requested view
-func searchColdTrace(ctx context.Context, req *ColdTraceRequest) (*mcp.CallToolResult, error) {
-	if err := validateColdTraceRequest(*req); err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	if req.View == "" {
-		req.View = ViewFull // Set default value
-	}
-
-	// Build duration from time range (defaults to last 1 hour)
-	timeCtx := GetTimeContext(ctx)
-	duration := BuildDurationWithContext(req.Start, req.End, req.Step, true, 60, timeCtx)
-
-	traces, err := trace.ColdTrace(ctx, duration, req.TraceID)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(ErrFailedToQueryColdTrace, req.TraceID, err)), nil
-	}
-	traceData := &traces
-
-	return processTraceResult(req.TraceID, traceData, req.View)
-}
-
-// generateTraceSummary creates a summary view from full trace data
-func generateTraceSummary(traceID string, traceData *api.Trace) *TraceSummary {
-	summary := &TraceSummary{
-		TraceID:    traceID,
-		TotalSpans: len(traceData.Spans),
-	}
-	services := make(map[string]struct{})
-
-	for _, span := range traceData.Spans {
+	var rootSpan *api.Span
+	var traceID string
+	var startTime, endTime int64
+	var isError bool
+	for _, span := range traceItem.Spans {
 		if span == nil {
 			continue
 		}
-		services[span.ServiceCode] = struct{}{}
+		if span.SpanID == 0 && span.ParentSpanID == -1 && rootSpan == nil {
+			rootSpan = span
+		}
+		if traceID == "" {
+			traceID = span.TraceID
+		}
+		if startTime == 0 || span.StartTime < startTime {
+			startTime = span.StartTime
+		}
+		if span.EndTime > endTime {
+			endTime = span.EndTime
+		}
 		if span.IsError != nil && *span.IsError {
-			summary.ErrorCount++
-		}
-		// Heuristic to find the root span: a span with spanId 0 and parentSpanId -1
-		if span.SpanID == 0 && span.ParentSpanID == -1 {
-			if span.EndpointName != nil {
-				summary.RootEndpoint = *span.EndpointName
-			}
-			summary.StartTime = span.StartTime
-			summary.EndTime = span.EndTime
-			if summary.StartTime > 0 && summary.EndTime > 0 {
-				summary.TotalDuration = summary.EndTime - summary.StartTime
-			}
+			isError = true
 		}
 	}
-
-	summary.HasErrors = summary.ErrorCount > 0
-	for service := range services {
-		summary.Services = append(summary.Services, service)
+	if rootSpan == nil {
+		rootSpan = traceItem.Spans[0]
 	}
-	sort.Strings(summary.Services) // Ensure deterministic order
-	return summary
-}
-
-// filterErrorSpans extracts only the spans with errors from full trace data
-func filterErrorSpans(traceData *api.Trace) []*api.Span {
-	var errorSpans []*api.Span
-	for _, span := range traceData.Spans {
-		if span != nil && span.IsError != nil && *span.IsError {
-			errorSpans = append(errorSpans, span)
-		}
+	endpointName := ""
+	if rootSpan.EndpointName != nil {
+		endpointName = *rootSpan.EndpointName
 	}
-	return errorSpans
+	return BasicTraceSummary{
+		TraceID:      traceID,
+		ServiceName:  rootSpan.ServiceCode,
+		EndpointName: endpointName,
+		StartTime:    startTime,
+		Duration:     endTime - startTime,
+		IsError:      isError,
+		SpanCount:    len(traceItem.Spans),
+	}
 }
 
 // validateTracesQueryRequest validates traces query request parameters
@@ -354,6 +253,7 @@ func setBasicFields(req *TracesQueryRequest, condition *api.TraceQueryCondition)
 	if req.EndpointID != "" {
 		condition.EndpointID = &req.EndpointID
 	}
+
 	if req.MinTraceDuration > 0 {
 		minDuration := int(req.MinTraceDuration)
 		condition.MinTraceDuration = &minDuration
@@ -482,17 +382,17 @@ func searchTraces(ctx context.Context, req *TracesQueryRequest) (*mcp.CallToolRe
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	// Execute query
-	traces, err := trace.Traces(ctx, condition)
+	// Execute query using queryTraces (v2 protocol)
+	traceList, err := tracesV2(ctx, condition)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf(ErrFailedToQueryTraces, err)), nil
 	}
 
-	return processTracesResult(&traces, req.View, req.SlowTraceThreshold)
+	return processTracesResult(&traceList, req.View, req.SlowTraceThreshold)
 }
 
 // processTracesResult handles the common logic for processing traces query results
-func processTracesResult(traces *api.TraceBrief, view string, slowTraceThreshold int64) (*mcp.CallToolResult, error) {
+func processTracesResult(traces *api.TraceList, view string, slowTraceThreshold int64) (*mcp.CallToolResult, error) {
 	if traces == nil || len(traces.Traces) == 0 {
 		return mcp.NewToolResultError(ErrNoTracesFound), nil
 	}
@@ -516,55 +416,54 @@ func processTracesResult(traces *api.TraceBrief, view string, slowTraceThreshold
 	return mcp.NewToolResultText(string(jsonBytes)), nil
 }
 
-// processTraceItem processes a single trace item and updates summary statistics
-func processTraceItem(traceItem *api.BasicTrace, summary *TracesSummary,
+// processTraceItem processes a single TraceV2 item and updates summary statistics
+func processTraceItem(traceItem *api.TraceV2, summary *TracesSummary,
 	services, endpoints map[string]struct{}, durations *[]int64,
 	errorTraces, slowTraces *[]BasicTraceSummary, slowTraceThreshold int64,
 	minStartTime, maxEndTime *int64, totalDuration *int64) {
-	if traceItem == nil {
+	if traceItem == nil || len(traceItem.Spans) == 0 {
 		return
 	}
 
-	// Parse start time
-	startTime, err := time.Parse(TimeFormatFull, traceItem.Start)
-	if err != nil {
-		return // Skip invalid traces
+	basic := createBasicTraceSummary(traceItem)
+	if basic.TraceID == "" {
+		return
 	}
-	startTimeMs := startTime.UnixMilli()
-	endTimeMs := startTimeMs + int64(traceItem.Duration)
+
+	endTimeMs := basic.StartTime + basic.Duration
 
 	// Track time range
-	if *minStartTime == 0 || startTimeMs < *minStartTime {
-		*minStartTime = startTimeMs
+	if *minStartTime == 0 || basic.StartTime < *minStartTime {
+		*minStartTime = basic.StartTime
 	}
 	if endTimeMs > *maxEndTime {
 		*maxEndTime = endTimeMs
 	}
 
-	// Calculate duration
-	duration := int64(traceItem.Duration)
-	*durations = append(*durations, duration)
-	*totalDuration += duration
+	*durations = append(*durations, basic.Duration)
+	*totalDuration += basic.Duration
 
-	// Count errors
-	isError := traceItem.IsError != nil && *traceItem.IsError
-	if isError {
+	if basic.IsError {
 		summary.ErrorCount++
-		*errorTraces = append(*errorTraces, createBasicTraceSummary(traceItem, startTimeMs, duration, true))
+		*errorTraces = append(*errorTraces, basic)
 	} else {
 		summary.SuccessCount++
 	}
 
-	// Identify slow traces only if threshold is configured
-	if slowTraceThreshold > 0 && duration > slowTraceThreshold {
-		*slowTraces = append(*slowTraces, createBasicTraceSummary(traceItem, startTimeMs, duration, isError))
+	if slowTraceThreshold > 0 && basic.Duration > slowTraceThreshold {
+		*slowTraces = append(*slowTraces, basic)
 	}
 
-	// Collect services and endpoints
-	services[traceItem.SegmentID] = struct{}{}
-	for _, endpoint := range traceItem.EndpointNames {
-		if endpoint != "" {
-			endpoints[endpoint] = struct{}{}
+	// Collect services and endpoints from all spans
+	for _, span := range traceItem.Spans {
+		if span == nil {
+			continue
+		}
+		if span.ServiceCode != "" {
+			services[span.ServiceCode] = struct{}{}
+		}
+		if span.EndpointName != nil && *span.EndpointName != "" {
+			endpoints[*span.EndpointName] = struct{}{}
 		}
 	}
 }
@@ -587,7 +486,7 @@ func calculateStatistics(durations []int64, totalDuration int64) (avgDuration fl
 }
 
 // generateTracesSummary creates a comprehensive summary from multiple traces
-func generateTracesSummary(traces *api.TraceBrief, slowTraceThreshold int64) *TracesSummary {
+func generateTracesSummary(traces *api.TraceList, slowTraceThreshold int64) *TracesSummary {
 	if traces == nil || len(traces.Traces) == 0 {
 		return &TracesSummary{}
 	}
@@ -646,23 +545,19 @@ func generateTracesSummary(traces *api.TraceBrief, slowTraceThreshold int64) *Tr
 }
 
 // filterErrorTraces extracts only error traces from the results
-func filterErrorTraces(traces *api.TraceBrief) []BasicTraceSummary {
+func filterErrorTraces(traces *api.TraceList) []BasicTraceSummary {
 	if traces == nil {
 		return nil
 	}
 
 	var errorTraces []BasicTraceSummary
 	for _, traceItem := range traces.Traces {
-		if traceItem != nil && traceItem.IsError != nil && *traceItem.IsError {
-			// Parse start time
-			startTime, err := time.Parse(TimeFormatFull, traceItem.Start)
-			if err != nil {
-				continue
-			}
-			startTimeMs := startTime.UnixMilli()
-
-			errorTraces = append(errorTraces,
-				createBasicTraceSummary(traceItem, startTimeMs, int64(traceItem.Duration), true))
+		if traceItem == nil {
+			continue
+		}
+		basic := createBasicTraceSummary(traceItem)
+		if basic.IsError {
+			errorTraces = append(errorTraces, basic)
 		}
 	}
 
@@ -673,93 +568,6 @@ func filterErrorTraces(traces *api.TraceBrief) []BasicTraceSummary {
 
 	return errorTraces
 }
-
-// SearchTraceTool is a tool for searching traces by trace ID with different views
-var SearchTraceTool = NewTool(
-	"get_trace_details",
-	`This tool provides detailed information about a distributed trace from SkyWalking OAP.
-
-Workflow:
-1. Use this tool when you need to analyze a specific trace by its trace ID
-2. Choose the appropriate view based on your analysis needs:
-   - 'full': For complete trace analysis with all spans and details
-   - 'summary': For quick overview and performance metrics
-   - 'errors_only': For troubleshooting and error investigation
-
-Best Practices:
-- Use 'summary' view first to get an overview of the trace
-- Switch to 'errors_only' if the summary shows errors
-- Use 'full' view for detailed debugging and span-by-span analysis
-- Trace IDs are typically found in logs, error messages, or monitoring dashboards
-
-Examples:
-- {"trace_id": "abc123..."}: Get complete trace details for analysis
-- {"trace_id": "abc123...", "view": "summary"}: Quick performance overview
-- {"trace_id": "abc123...", "view": "errors_only"}: Focus on error spans only`,
-	searchTrace,
-	mcp.WithTitleAnnotation("Search a trace by TraceId"),
-	mcp.WithString("trace_id", mcp.Required(),
-		mcp.Description(`The unique identifier of the trace to retrieve.`),
-	),
-	mcp.WithString("view",
-		mcp.Enum(ViewFull, ViewSummary, ViewErrorsOnly),
-		mcp.Description(`Specifies the level of detail for trace analysis:
-- 'full': (Default) Complete trace with all spans, service calls, and metadata
-- 'summary': High-level overview with services, duration, and error count
-- 'errors_only': Only spans marked as errors for troubleshooting`),
-	),
-)
-
-// ColdTraceTool is a tool for searching traces from cold storage by trace ID with different views
-var ColdTraceTool = NewTool(
-	"get_cold_trace_details",
-	`This tool queries BanyanDB cold storage for historical trace data that may no longer be available in hot storage.
-
-Important Notes:
-- Only works with BanyanDB storage backend
-- Queries older trace data that has been moved to cold storage
-- May have slower response times compared to hot storage queries
-- Use when trace data is not found in regular trace queries
-
-Time Range Format:
-- Absolute time: "2023-01-01 12:00:00", "2023-01-01 12"
-- Relative time: "-30m" (30 minutes ago), "-1h" (1 hour ago), "now"
-- Step: "SECOND", "MINUTE", "HOUR", "DAY"
-
-Usage Scenarios:
-- Historical incident investigation
-- Long-term performance analysis
-- Compliance and audit requirements
-- When hot storage queries return no results
-
-Examples:
-- {"trace_id": "abc123...", "start": "-7d", "end": "now"}: Search last 7 days of cold storage
-- {"trace_id": "abc123...", "start": "-30m", "end": "now"}: Search from 30 minutes ago to now
-- {"trace_id": "abc123...", "start": "-1h", "end": "now", "view": "summary"}: Quick summary from last hour
-- {"trace_id": "abc123...", "start": "-2h30m", "end": "now", "view": "errors_only"}: Error analysis from last 2.5 hours`,
-	searchColdTrace,
-	mcp.WithTitleAnnotation("Search a cold trace by TraceId"),
-	mcp.WithString("trace_id", mcp.Required(),
-		mcp.Description(`The unique identifier of the trace to retrieve from cold storage. Use this when regular trace queries return no results.`),
-	),
-	mcp.WithString("start",
-		mcp.Description(`Start time for cold storage query. Examples: "-7d", "2023-01-01 12:00:00"`),
-	),
-	mcp.WithString("end",
-		mcp.Description(`End time for cold storage query. Examples: "now", "2023-01-01 13:00:00"`),
-	),
-	mcp.WithString("step",
-		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
-		mcp.Description("Time step granularity. If not specified, uses adaptive sizing."),
-	),
-	mcp.WithString("view",
-		mcp.Enum(ViewFull, ViewSummary, ViewErrorsOnly),
-		mcp.Description(`Specifies the level of detail for cold trace analysis:
-- 'full': (Default) Complete trace with all spans from cold storage
-- 'summary': High-level overview with services, duration, and error count
-- 'errors_only': Only error spans for focused troubleshooting`),
-	),
-)
 
 // TracesQueryTool is a tool for querying traces with various conditions
 var TracesQueryTool = NewTool(
