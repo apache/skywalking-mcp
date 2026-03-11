@@ -44,6 +44,8 @@ type LogQueryRequest struct {
 	ServiceInstanceID string   `json:"service_instance_id,omitempty"`
 	EndpointID        string   `json:"endpoint_id,omitempty"`
 	TraceID           string   `json:"trace_id,omitempty"`
+	SegmentID         string   `json:"segment_id,omitempty"`
+	SpanID            *int     `json:"span_id,omitempty"`
 	Tags              []LogTag `json:"tags,omitempty"`
 	Start             string   `json:"start,omitempty"`
 	End               string   `json:"end,omitempty"`
@@ -51,6 +53,7 @@ type LogQueryRequest struct {
 	Cold              bool     `json:"cold,omitempty"`
 	PageNum           int      `json:"page_num,omitempty"`
 	PageSize          int      `json:"page_size,omitempty"`
+	QueryOrder        string   `json:"query_order,omitempty"`
 }
 
 // buildLogQueryCondition builds the log query condition from request parameters
@@ -65,13 +68,26 @@ func buildLogQueryCondition(req *LogQueryRequest, timeCtx TimeContext) *api.LogQ
 
 	paging := BuildPagination(req.PageNum, req.PageSize)
 
+	order := api.OrderDes
+	if req.QueryOrder == "ASC" {
+		order = api.OrderAsc
+	}
+
 	cond := &api.LogQueryCondition{
 		ServiceID:         &req.ServiceID,
 		ServiceInstanceID: &req.ServiceInstanceID,
 		EndpointID:        &req.EndpointID,
-		RelatedTrace:      &api.TraceScopeCondition{TraceID: req.TraceID},
 		QueryDuration:     &duration,
 		Paging:            paging,
+		QueryOrder:        &order,
+	}
+
+	if req.TraceID != "" || req.SegmentID != "" || req.SpanID != nil {
+		cond.RelatedTrace = &api.TraceScopeCondition{
+			TraceID:   req.TraceID,
+			SegmentID: &req.SegmentID,
+			SpanID:    req.SpanID,
+		}
 	}
 
 	if len(tags) > 0 {
@@ -111,12 +127,15 @@ Workflow:
 Examples:
 - {"service_id": "Your_ApplicationName", "start": "2024-06-01 12:00:00", "end": "2024-06-01 13:00:00"}: Query logs for a service in a time range
 - {"trace_id": "abc123..."}: Query logs related to a specific trace
+- {"trace_id": "abc123...", "segment_id": "seg456...", "span_id": 0}: Query logs for a specific span
 - {"tags": [{"key": "level", "value": "ERROR"}], "cold": true}: Query error logs from cold storage`,
 	queryLogs,
 	mcp.WithString("service_id", mcp.Description("Service ID to filter logs.")),
 	mcp.WithString("service_instance_id", mcp.Description("Service instance ID to filter logs.")),
 	mcp.WithString("endpoint_id", mcp.Description("Endpoint ID to filter logs.")),
-	mcp.WithString("trace_id", mcp.Description("Related trace ID.")),
+	mcp.WithString("trace_id", mcp.Description("Related trace ID to filter logs by trace scope.")),
+	mcp.WithString("segment_id", mcp.Description("Related segment ID to narrow logs to a specific segment within a trace.")),
+	mcp.WithNumber("span_id", mcp.Description("Related span ID to narrow logs to a specific span within a segment.")),
 	mcp.WithArray("tags", mcp.Description("Array of log tags, each with key and value.")),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
 	mcp.WithString("end", mcp.Description("End time for the query.")),
@@ -127,4 +146,6 @@ Examples:
 	mcp.WithBoolean("cold", mcp.Description("Whether to query from cold-stage storage.")),
 	mcp.WithNumber("page_num", mcp.Description("Page number, default 1.")),
 	mcp.WithNumber("page_size", mcp.Description("Page size, default 15.")),
+	mcp.WithString("query_order", mcp.Enum("ASC", "DES"),
+		mcp.Description("Order logs by timestamp: ASC (oldest first) or DES (newest first, default).")),
 )
