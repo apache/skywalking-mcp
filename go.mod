@@ -3,7 +3,7 @@ module github.com/apache/skywalking-mcp
 go 1.25.0
 
 require (
-	github.com/apache/skywalking-cli v0.0.0-20250604010708-77b4c49e89c9
+	github.com/apache/skywalking-cli v0.0.0-20251013114703-9a1beab08413
 	github.com/machinebox/graphql v0.2.2
 	github.com/mark3labs/mcp-go v0.45.0
 	github.com/sirupsen/logrus v1.9.4
