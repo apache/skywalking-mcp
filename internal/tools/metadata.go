@@ -124,7 +124,7 @@ Examples:
 		mcp.Description(`Start time for the query. Examples: "2024-01-01 12:00:00", "-1h" (1 hour ago).`),
 	),
 	mcp.WithString("end",
-		mcp.Description(`End time for the query. Examples: "2024-01-01 13:00:00", "now".`),
+		mcp.Description(`End time for the query. Examples: "2024-01-01 13:00:00", "now". Defaults to current time if omitted.`),
 	),
 	mcp.WithString("step",
 		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),

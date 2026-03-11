@@ -60,14 +60,14 @@ const (
 // Error constants
 const (
 	ErrFailedToQueryTraces  = "failed to query traces: %v"
-	ErrNoFilterCondition      = "at least one filter condition must be provided"
-	ErrInvalidDurationRange   = "invalid duration range: min_duration (%d) > max_duration (%d)"
-	ErrNegativePageSize       = "page_size cannot be negative"
-	ErrNegativePageNum        = "page_num cannot be negative"
-	ErrInvalidTraceState      = "invalid trace_state '%s', available states: %s, %s, %s"
-	ErrInvalidQueryOrder      = "invalid query_order '%s', available orders: %s, %s"
-	ErrInvalidView = "invalid view '%s', available views: %s, %s, %s"
-	ErrNoTracesFound          = "no traces found matching the query criteria"
+	ErrNoFilterCondition    = "at least one filter condition must be provided"
+	ErrInvalidDurationRange = "invalid duration range: min_duration (%d) > max_duration (%d)"
+	ErrNegativePageSize     = "page_size cannot be negative"
+	ErrNegativePageNum      = "page_num cannot be negative"
+	ErrInvalidTraceState    = "invalid trace_state '%s', available states: %s, %s, %s"
+	ErrInvalidQueryOrder    = "invalid query_order '%s', available orders: %s, %s"
+	ErrInvalidView          = "invalid view '%s', available views: %s, %s, %s"
+	ErrNoTracesFound        = "no traces found matching the query criteria"
 )
 
 // queryTracesV2GQL is the GraphQL query for the trace-v2 protocol
@@ -637,7 +637,7 @@ Examples:
 		mcp.Description("Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)"),
 	),
 	mcp.WithString("end",
-		mcp.Description("End time for the query. Examples: \"2023-01-01 13:00:00\", \"now\", \"-10m\" (10 minutes ago)"),
+		mcp.Description("End time for the query. Examples: \"2023-01-01 13:00:00\", \"now\", \"-10m\" (10 minutes ago) Defaults to current time if omitted."),
 	),
 	mcp.WithString("step",
 		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),

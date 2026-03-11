@@ -176,7 +176,7 @@ Examples:
 		mcp.Required(),
 		mcp.Description("The ID of the service instance to query process topology for.")),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
-	mcp.WithString("end", mcp.Description("End time for the query.")),
+	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
 		mcp.Description("Time step granularity. If not specified, uses adaptive step sizing.")),
 )
@@ -195,7 +195,7 @@ Examples:
 		mcp.Required(),
 		mcp.Description("The ID of the endpoint to query dependencies for.")),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
-	mcp.WithString("end", mcp.Description("End time for the query.")),
+	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
 		mcp.Description("Time step granularity. If not specified, uses adaptive step sizing.")),
 )
@@ -217,7 +217,7 @@ Examples:
 		mcp.Required(),
 		mcp.Description("The ID of the server (downstream) service.")),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
-	mcp.WithString("end", mcp.Description("End time for the query.")),
+	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
 		mcp.Description("Time step granularity. If not specified, uses adaptive step sizing.")),
 )
@@ -239,7 +239,7 @@ Examples:
 	mcp.WithString("layer",
 		mcp.Description("Layer to filter the global topology (e.g. GENERAL, MESH). Only used when service_ids is empty.")),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
-	mcp.WithString("end", mcp.Description("End time for the query.")),
+	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
 		mcp.Description("Time step granularity. If not specified, uses adaptive step sizing.")),
 )

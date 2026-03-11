@@ -128,7 +128,7 @@ Examples:
 		mcp.Description("Event type: Normal or Error.")),
 	mcp.WithString("layer", mcp.Description("Layer to filter events.")),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
-	mcp.WithString("end", mcp.Description("End time for the query.")),
+	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
 		mcp.Description("Time step granularity. If not specified, uses adaptive step sizing.")),
 	mcp.WithString("order", mcp.Enum("ASC", "DES"),
