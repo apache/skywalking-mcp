@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Build stage
-FROM golang:1.25-bullseye AS builder
+FROM golang:1.25-bookworm AS builder
 
 # Default version
 ARG VERSION="dev"
@@ -37,7 +37,7 @@ RUN CGO_ENABLED=0 go build \
     -o bin/swmcp ./cmd/skywalking-mcp/main.go
 
 # Make a stage to run the app
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 # Install ca-certificates for HTTPS requests
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
