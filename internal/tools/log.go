@@ -83,11 +83,22 @@ func buildLogQueryCondition(req *LogQueryRequest, timeCtx TimeContext) *api.LogQ
 	}
 
 	if req.TraceID != "" || req.SegmentID != "" || req.SpanID != nil {
-		cond.RelatedTrace = &api.TraceScopeCondition{
-			TraceID:   req.TraceID,
-			SegmentID: &req.SegmentID,
-			SpanID:    req.SpanID,
+		traceScope := &api.TraceScopeCondition{}
+
+		if req.TraceID != "" {
+			traceScope.TraceID = req.TraceID
 		}
+
+		if req.SegmentID != "" {
+			// Only set SegmentID when it is actually provided to avoid filtering by an empty segment.
+			traceScope.SegmentID = &req.SegmentID
+		}
+
+		if req.SpanID != nil {
+			traceScope.SpanID = req.SpanID
+		}
+
+		cond.RelatedTrace = traceScope
 	}
 
 	if len(tags) > 0 {
