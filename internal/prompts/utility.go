@@ -61,7 +61,7 @@ func exploreServiceTopologyHandler(_ context.Context, request mcp.GetPromptReque
 	end := args["end"]
 
 	if end == "" {
-		end = "now"
+		end = defaultEnd
 	}
 
 	prompt := fmt.Sprintf(`Explore the service topology of layer "%s" within the time range from "%s" to "%s".

@@ -34,7 +34,7 @@ func performanceAnalysisHandler(_ context.Context, request mcp.GetPromptRequest)
 		start = defaultDuration
 	}
 	if end == "" {
-		end = "now"
+		end = defaultEnd
 	}
 
 	// Use the dynamic tool instructions
@@ -143,7 +143,7 @@ func compareServicesHandler(_ context.Context, request mcp.GetPromptRequest) (*m
 		start = defaultDuration
 	}
 	if end == "" {
-		end = "now"
+		end = defaultEnd
 	}
 
 	prompt := fmt.Sprintf(`Please compare the following services: %s

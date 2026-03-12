@@ -20,5 +20,6 @@ package prompts
 // Constants for common values
 const (
 	defaultDuration = "-1h"
+	defaultEnd      = "now"
 	allMetrics      = "all"
 )

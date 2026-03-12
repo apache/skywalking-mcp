@@ -35,7 +35,7 @@ func traceInvestigationHandler(_ context.Context, request mcp.GetPromptRequest) 
 		start = defaultDuration
 	}
 	if end == "" {
-		end = "now"
+		end = defaultEnd
 	}
 	if traceState == "" {
 		traceState = "all"
@@ -98,7 +98,7 @@ func logAnalysisHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.G
 		start = defaultDuration
 	}
 	if end == "" {
-		end = "now"
+		end = defaultEnd
 	}
 	if logLevel == "" {
 		logLevel = "ERROR"

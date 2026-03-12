@@ -36,7 +36,7 @@ func addCoreAnalysisPrompts(s *server.MCPServer) {
 		Description: "Analyze service performance using metrics tools",
 		Arguments: []mcp.PromptArgument{
 			{Name: "service_name", Description: "The name of the service to analyze", Required: true},
-			{Name: "start", Description: `Start of the analysis window. Examples: "-1h" (past hour), "-30m" (past 30 minutes), "2024-01-01 12:00:00". Default: -1h`, Required: false},
+			{Name: "start", Description: `Start of the analysis window. Examples: "-1h", "-30m", "2024-01-01 12:00:00". Default: -1h`, Required: false},
 			{Name: "end", Description: `End of the analysis window. Examples: "now", "2024-01-01 13:00:00". Default: now`, Required: false},
 		},
 	}, performanceAnalysisHandler)
@@ -48,7 +48,7 @@ func addCoreAnalysisPrompts(s *server.MCPServer) {
 		Arguments: []mcp.PromptArgument{
 			{Name: "services", Description: "Comma-separated list of service names to compare", Required: true},
 			{Name: "metrics", Description: "Metrics to compare (response_time, sla, cpm, all)", Required: false},
-			{Name: "start", Description: `Start of the comparison window. Examples: "-1h" (last hour), "-2h" (last 2 hours), "-1d" (last day). Default: -1h`, Required: false},
+			{Name: "start", Description: `Start of the comparison window. Examples: "-1h", "-2h", "-1d". Default: -1h`, Required: false},
 			{Name: "end", Description: `End of the comparison window. Examples: "now", "2024-01-01 13:00:00". Default: now`, Required: false},
 		},
 	}, compareServicesHandler)
