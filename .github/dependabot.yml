@@ -20,10 +20,6 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-    reviewers:
-      - "CodePrometheus"
-    assignees:
-      - "CodePrometheus"
     ignore:
       - dependency-name: "github.com/apache/skywalking-cli"
     groups:
