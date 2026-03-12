@@ -18,32 +18,33 @@
 package swmcp
 
 import (
-"context"
-"fmt"
-"net/http"
-"os"
+	"context"
+	"fmt"
+	"net/http"
+	"os"
 
-"github.com/mark3labs/mcp-go/server"
-"github.com/sirupsen/logrus"
-"github.com/spf13/viper"
+	"github.com/mark3labs/mcp-go/server"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
-"github.com/apache/skywalking-cli/pkg/contextkey"
+	"github.com/apache/skywalking-cli/pkg/contextkey"
 
-"github.com/apache/skywalking-mcp/internal/config"
-"github.com/apache/skywalking-mcp/internal/prompts"
-"github.com/apache/skywalking-mcp/internal/resources"
-"github.com/apache/skywalking-mcp/internal/tools"
+	"github.com/apache/skywalking-mcp/internal/config"
+	"github.com/apache/skywalking-mcp/internal/prompts"
+	"github.com/apache/skywalking-mcp/internal/resources"
+	"github.com/apache/skywalking-mcp/internal/tools"
 )
 
 // newMcpServer creates a new MCP server instance,
 // and we can add various tools and capabilities to it.
 func newMcpServer() *server.MCPServer {
 	mcpServer := server.NewMCPServer(
-"skywalking-mcp",
-"0.1.0",
-server.WithResourceCapabilities(true, true),
-server.WithPromptCapabilities(true),
-server.WithLogging())
+		"skywalking-mcp",
+		"0.1.0",
+		server.WithResourceCapabilities(true, true),
+		server.WithPromptCapabilities(true),
+		server.WithLogging(),
+	)
 
 	// add tools and capabilities to the MCP server
 	tools.AddTraceTools(mcpServer)

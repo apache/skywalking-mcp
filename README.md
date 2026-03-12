@@ -99,17 +99,41 @@ If using Docker:
 
 SkyWalking MCP provides the following tools to query and analyze SkyWalking OAP data:
 
-| Category    | Tool Name                | Description                            | Key Features                                                                                                                                                                                                                                                                  |
-|-------------|--------------------------|----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Trace**   | `get_trace_details`      | Get detailed trace information         | Retrieve trace by ID; **Multiple views**: `full` (complete trace), `summary` (overview with metrics), `errors_only` (error spans only); Detailed span analysis                                                                                                                |
-| **Trace**   | `get_cold_trace_details` | Get trace details from cold storage    | Query historical traces from BanyanDB; **Multiple views**: `full`, `summary`, `errors_only`; Duration-based search; Historical incident investigation                                                                                                                         |
-| **Trace**   | `query_traces`           | Query traces with intelligent analysis | Multi-condition filtering (service, endpoint, duration, state, tags); **Multiple views**: `full` (raw data), `summary` (intelligent analysis with performance insights), `errors_only` (error traces); Sort options; Slow trace detection; Performance metrics and statistics |
-| **Metrics** | `query_single_metrics`   | Query single metric values             | Get specific metric values (CPM, response time, SLA, Apdex); Multiple entity scopes (Service, ServiceInstance, Endpoint, Process, Relations); Time range and cold storage support                                                                                             |
-| **Metrics** | `query_top_n_metrics`    | Query top N metric rankings            | Rank entities by metric values; Configurable top N count; Ascending/descending order; Scope-based filtering; Performance analysis and issue identification                                                                                                                    |
-| **Log**     | `query_logs`             | Query logs from SkyWalking OAP         | Filter by service, instance, endpoint, trace ID, tags; Time range queries; Cold storage support; Pagination support                                                                                                                                                           |
-| **MQE**     | `execute_mqe_expression` | Execute MQE expressions for metrics    | Execute complex MQE (Metrics Query Expression) queries; Support calculations, aggregations, comparisons, TopN, trend analysis; Multiple result types (single value, time series, sorted list); Entity filtering and relation metrics; Debug and tracing capabilities          |
-| **MQE**     | `list_mqe_metrics`       | List available metrics for MQE         | Discover available metrics for MQE queries; Filter by regex patterns; Get metric metadata (type, catalog); Support service, instance, endpoint, relation, database, and infrastructure metrics                                                                                |
-| **MQE**     | `get_mqe_metric_type`    | Get metric type information            | Get detailed type information for specific metrics; Understand metric structure (regular value, labeled value, sampled record); Help with correct MQE expression syntax                                                                                                       |
+| Category     | Tool Name                      | Description                                                                                       |
+|--------------|--------------------------------|---------------------------------------------------------------------------------------------------|
+| **Trace**    | `query_traces`                 | Query traces with multi-condition filtering (service, endpoint, duration, state, tags). Supports `full`, `summary`, and `errors_only` views with performance insights. |
+| **Log**      | `query_logs`                   | Query logs with filters for service, instance, endpoint, trace ID, tags, and time range. Supports cold storage and pagination. |
+| **MQE**      | `execute_mqe_expression`       | Execute MQE (Metrics Query Expression) to query and calculate metrics data. Supports calculations, aggregations, TopN, trend analysis, and multiple result types. |
+| **MQE**      | `list_mqe_metrics`             | List available metrics for MQE queries. Filter by regex pattern; returns metric name, type, and catalog. |
+| **MQE**      | `get_mqe_metric_type`          | Get type information (REGULAR_VALUE, LABELED_VALUE, SAMPLED_RECORD) for a specific metric to help build correct MQE expressions. |
+| **Metadata** | `list_layers`                  | List all layers registered in SkyWalking OAP (e.g. GENERAL, MESH, K8S).                          |
+| **Metadata** | `list_services`                | List all services registered in SkyWalking OAP under a specific layer.                            |
+| **Metadata** | `list_instances`               | List all instances of a service (e.g. pods or JVM processes).                                     |
+| **Metadata** | `list_endpoints`               | List endpoints of a service with optional keyword filtering.                                       |
+| **Metadata** | `list_processes`               | List processes of a service instance.                                                              |
+| **Event**    | `query_events`                 | Query events (deployments, restarts, scaling) with filters for service, instance, endpoint, type, and layer. |
+| **Alarm**    | `query_alarms`                 | Query alarms triggered by metric threshold breaches. Filter by scope, keyword, and tags.          |
+| **Topology** | `query_services_topology`      | Query global or scoped service topology. Optionally filter by specific service IDs or layer.      |
+| **Topology** | `query_instances_topology`     | Query service instance topology between a client service and a server service.                    |
+| **Topology** | `query_endpoints_topology`     | Query endpoint dependency topology for a given endpoint.                                          |
+| **Topology** | `query_processes_topology`     | Query process topology for a given service instance.                                              |
+
+## Available Prompts
+
+SkyWalking MCP provides the following prompts for guided analysis workflows:
+
+| Category        | Prompt Name                  | Description                                                                                          | Arguments                                                                                    |
+|-----------------|------------------------------|------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+| **Performance** | `analyze-performance`        | Analyze service performance using metrics tools                                                      | `service_name` (required), `duration` (optional)                                            |
+| **Performance** | `compare-services`           | Compare performance metrics between multiple services                                                | `services` (required), `metrics` (optional), `time_range` (optional)                        |
+| **Performance** | `top-services`               | Find top N services ranked by a given metric                                                         | `metric_name` (required), `top_n` (optional), `order` (optional)                            |
+| **Trace**       | `investigate-traces`         | Investigate traces for errors and performance issues                                                 | `service_id` (optional), `trace_state` (optional), `duration` (optional)                    |
+| **Trace**       | `trace-deep-dive`            | Deep dive analysis of a specific trace                                                               | `trace_id` (required), `view` (optional), `check_cold_storage` (optional)                   |
+| **Log**         | `analyze-logs`               | Analyze service logs for errors and patterns                                                         | `service_id` (optional), `log_level` (optional), `duration` (optional)                      |
+| **Topology**    | `explore-service-topology`   | Explore services, instances, endpoints, and processes within a layer and time range                  | `layer` (required), `start` (required), `end` (optional)                                    |
+| **MQE**         | `build-mqe-query`            | Help build MQE expressions for complex metric queries                                                | `query_type` (required), `metrics` (required), `conditions` (optional)                      |
+| **MQE**         | `explore-metrics`            | Explore available metrics and their types                                                            | `pattern` (optional), `show_examples` (optional)                                            |
+| **Utility**     | `generate_duration`          | Convert a natural-language time range into a `{start, end}` duration object for use with other tools | `time_range` (required)                                                                      |
 
 ## Contact Us
 

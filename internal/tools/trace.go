@@ -676,8 +676,16 @@ Examples:
 			"Examples: 500 (0.5s), 2000 (2s), 5000 (5s)"),
 	),
 	mcp.WithArray("tags",
-		mcp.Description(`Array of span tags to filter traces. Each tag should have 'key' and 'value' fields. 
+		mcp.Description(`Array of span tags to filter traces. Each tag should have 'key' and 'value' fields.
 Examples: [{"key": "http.method", "value": "POST"}, {"key": "http.status_code", "value": "500"}]`),
+		mcp.Items(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"key":   map[string]any{"type": "string"},
+				"value": map[string]any{"type": "string"},
+			},
+			"required": []string{"key", "value"},
+		}),
 	),
 	mcp.WithBoolean("cold",
 		mcp.Description("Whether to query from cold-stage storage. Set to true for historical data queries."),

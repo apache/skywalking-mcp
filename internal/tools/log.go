@@ -136,7 +136,17 @@ Examples:
 	mcp.WithString("trace_id", mcp.Description("Related trace ID to filter logs by trace scope.")),
 	mcp.WithString("segment_id", mcp.Description("Related segment ID to narrow logs to a specific segment within a trace.")),
 	mcp.WithNumber("span_id", mcp.Description("Related span ID to narrow logs to a specific span within a segment.")),
-	mcp.WithArray("tags", mcp.Description("Array of log tags, each with key and value.")),
+	mcp.WithArray("tags",
+		mcp.Description("Array of log tags, each with key and value."),
+		mcp.Items(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"key":   map[string]any{"type": "string"},
+				"value": map[string]any{"type": "string"},
+			},
+			"required": []string{"key", "value"},
+		}),
+	),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
 	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),

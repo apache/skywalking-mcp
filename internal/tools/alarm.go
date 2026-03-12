@@ -104,7 +104,17 @@ Examples:
 			"ServiceRelation", "ServiceInstanceRelation", "EndpointRelation", "ProcessRelation"),
 		mcp.Description("Scope to filter alarms.")),
 	mcp.WithString("keyword", mcp.Description("Keyword to filter alarm messages.")),
-	mcp.WithArray("tags", mcp.Description("Array of alarm tags to filter by, each with key and value.")),
+	mcp.WithArray("tags",
+		mcp.Description("Array of alarm tags to filter by, each with key and value."),
+		mcp.Items(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"key":   map[string]any{"type": "string"},
+				"value": map[string]any{"type": "string"},
+			},
+			"required": []string{"key", "value"},
+		}),
+	),
 	mcp.WithString("start", mcp.Description("Start time for the query.")),
 	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
