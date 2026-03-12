@@ -23,6 +23,7 @@ import "fmt"
 var toolCapabilities = map[string][]string{
 	"performance_analysis": {
 		"execute_mqe_expression",
+		"query_traces",
 	},
 	"trace_investigation": {
 		"query_traces",
