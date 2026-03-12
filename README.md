@@ -57,7 +57,7 @@ bin/swmcp stdio --sw-url http://localhost:12800
 bin/swmcp sse --sse-address localhost:8000 --base-path /mcp --sw-url http://localhost:12800
 ```
 
-### Usage with Cursor
+### Usage with Cursor, Copilot, Claude Code
 
 ```json
 {
@@ -89,7 +89,7 @@ If using Docker:
 		"skywalking-mcp:latest",
 		"--sw-url",
 		"http://localhost:12800"
-      }
+      ]
     }
   }
 }

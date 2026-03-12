@@ -120,7 +120,7 @@ var LogQueryTool = NewTool(
 Workflow:
 1. Use this tool to find logs matching specific criteria
 2. Specify one or more query conditions to narrow down results
-3. Use duration to limit the time range for the search
+3. Use start/end to limit the time range for the search
 4. Supports filtering by service, instance, endpoint, trace, tags, and time
 5. Supports cold storage query and pagination
 
