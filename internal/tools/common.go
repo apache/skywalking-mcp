@@ -213,13 +213,15 @@ func determineAdaptiveStep(startTime, endTime time.Time) api.Step {
 	duration := endTime.Sub(startTime)
 	if duration >= 7*24*time.Hour {
 		return api.StepDay
-	} else if duration >= 24*time.Hour {
+	}
+	if duration >= 24*time.Hour {
 		return api.StepHour
-	} else if duration >= time.Hour {
+	}
+	if duration >= time.Hour {
 		return api.StepMinute
 	}
 
-	return api.StepSecond
+	return api.StepMinute
 }
 
 // parseLegacyDuration parses legacy duration strings like "7d", "24h"

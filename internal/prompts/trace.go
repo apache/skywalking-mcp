@@ -28,10 +28,14 @@ func traceInvestigationHandler(_ context.Context, request mcp.GetPromptRequest) 
 	args := request.Params.Arguments
 	serviceID := args["service_id"]
 	traceState := args["trace_state"]
-	duration := args["duration"]
+	start := args["start"]
+	end := args["end"]
 
-	if duration == "" {
-		duration = defaultDuration
+	if start == "" {
+		start = defaultDuration
+	}
+	if end == "" {
+		end = "now"
 	}
 	if traceState == "" {
 		traceState = "all"
@@ -40,14 +44,14 @@ func traceInvestigationHandler(_ context.Context, request mcp.GetPromptRequest) 
 	// Use the dynamic tool instructions
 	toolInstructions := generateToolInstructions("trace_investigation")
 
-	prompt := fmt.Sprintf(`Investigate traces with filters: service_id="%s", trace_state="%s", duration="%s".
+	prompt := fmt.Sprintf(`Investigate traces with filters: service_id="%s", trace_state="%s", start="%s", end="%s".
 
 %s
 
 **Analysis Steps:**
 
 **Find Problematic Traces**
-- First use query_traces with view="summary" to get overview
+- First use query_traces with start="%[3]s", end="%[4]s", view="summary" to get overview
 - Look for patterns in error traces, slow traces, or anomalies
 - Note trace IDs that need deeper investigation
 
@@ -67,7 +71,7 @@ func traceInvestigationHandler(_ context.Context, request mcp.GetPromptRequest) 
 - Group errors by type and service
 - Identify error propagation paths
 
-Provide specific findings and actionable recommendations.`, serviceID, traceState, duration, toolInstructions)
+Provide specific findings and actionable recommendations.`, serviceID, traceState, start, end, toolInstructions)
 
 	return &mcp.GetPromptResult{
 		Description: "Trace investigation using query tools",
@@ -87,10 +91,14 @@ func logAnalysisHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.G
 	args := request.Params.Arguments
 	serviceID := args["service_id"]
 	logLevel := args["log_level"]
-	duration := args["duration"]
+	start := args["start"]
+	end := args["end"]
 
-	if duration == "" {
-		duration = defaultDuration
+	if start == "" {
+		start = defaultDuration
+	}
+	if end == "" {
+		end = "now"
 	}
 	if logLevel == "" {
 		logLevel = "ERROR"
@@ -102,7 +110,7 @@ func logAnalysisHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.G
 - query_logs with following parameters:
   - service_id: "%s" (if specified)
   - tags: [{"key": "level", "value": "%s"}] for log level filtering
-  - duration: "%s" for time range
+  - start: "%s", end: "%s" for time range
   - cold: true if historical data needed
 
 **Analysis Steps:**
@@ -129,7 +137,7 @@ func logAnalysisHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.G
 - Use trace_id from logs to get detailed trace analysis
 - Cross-reference with metrics for full picture
 
-Provide specific log analysis findings and recommendations.`, serviceID, logLevel, duration)
+Provide specific log analysis findings and recommendations.`, serviceID, logLevel, start, end)
 
 	return &mcp.GetPromptResult{
 		Description: "Log analysis using query_logs tool",

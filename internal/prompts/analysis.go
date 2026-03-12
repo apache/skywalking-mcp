@@ -27,44 +27,50 @@ import (
 func performanceAnalysisHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	serviceName := args["service_name"]
-	duration := args["duration"]
+	start := args["start"]
+	end := args["end"]
 
-	if duration == "" {
-		duration = defaultDuration
+	if start == "" {
+		start = defaultDuration
+	}
+	if end == "" {
+		end = "now"
 	}
 
 	// Use the dynamic tool instructions
 	toolInstructions := generateToolInstructions("performance_analysis")
 
-	prompt := fmt.Sprintf(`Please analyze the performance of service '%s' over the last %s.
+	prompt := fmt.Sprintf(`Please analyze the performance of service '%s' for the time range start="%s", end="%s".
 
 %s
 
 **Analysis Required:**
 
+Use start="%[2]s", end="%[3]s" on every tool call below.
+
 **Response Time Analysis**
-- Use execute_mqe_expression with expression="service_resp_time" to get average response time
-- Use execute_mqe_expression with expression="service_percentile{p='50,75,90,95,99'}" to get percentiles
+- Use execute_mqe_expression with expression="service_resp_time", start="%[2]s", end="%[3]s"
+- Use execute_mqe_expression with expression="service_percentile{p='50,75,90,95,99'}", start="%[2]s", end="%[3]s"
 - Identify trends and anomalies
 
 **Success Rate and SLA**
-- Use execute_mqe_expression with expression="service_sla / 100" to get success rate percentage
-- Use execute_mqe_expression with expression="service_apdex / 10000" for user satisfaction score
+- Use execute_mqe_expression with expression="service_sla / 100", start="%[2]s", end="%[3]s"
+- Use execute_mqe_expression with expression="service_apdex / 10000", start="%[2]s", end="%[3]s"
 - Track SLA compliance over time
 
 **Traffic Analysis**
-- Use execute_mqe_expression with expression="service_cpm" to get calls per minute
+- Use execute_mqe_expression with expression="service_cpm", start="%[2]s", end="%[3]s"
 - Identify traffic patterns and peak periods
 
 **Error Analysis**
-- Use query_traces with trace_state="error" to find error traces
+- Use query_traces with trace_state="error", start="%[2]s", end="%[3]s" to find error traces
 - Identify most common error types and affected endpoints
 
 **Performance Bottlenecks**
-- Use execute_mqe_expression with expression="top_n(endpoint_resp_time, 5, DES)" to find slowest endpoints
-- Use execute_mqe_expression with expression="top_n(endpoint_cpm, 5, DES)" to find high-traffic endpoints
+- Use execute_mqe_expression with expression="top_n(endpoint_resp_time, 5, DES)", start="%[2]s", end="%[3]s"
+- Use execute_mqe_expression with expression="top_n(endpoint_cpm, 5, DES)", start="%[2]s", end="%[3]s"
 
-Please provide actionable insights and specific recommendations based on the data.`, serviceName, duration, toolInstructions)
+Please provide actionable insights and specific recommendations based on the data.`, serviceName, start, end, toolInstructions)
 
 	return &mcp.GetPromptResult{
 		Description: "Performance analysis using SkyWalking tools",
@@ -127,19 +133,25 @@ func compareServicesHandler(_ context.Context, request mcp.GetPromptRequest) (*m
 	args := request.Params.Arguments
 	services := args["services"]
 	metrics := args["metrics"]
-	timeRange := args["time_range"]
+	start := args["start"]
+	end := args["end"]
 
 	if metrics == "" {
 		metrics = allMetrics
 	}
-	if timeRange == "" {
-		timeRange = defaultDuration
+	if start == "" {
+		start = defaultDuration
+	}
+	if end == "" {
+		end = "now"
 	}
 
 	prompt := fmt.Sprintf(`Please compare the following services: %s
 
-Time Range: %s
+Time Range: start="%s", end="%s"
 Metrics to Compare: %s
+
+Use start="%[2]s", end="%[3]s" on every execute_mqe_expression call.
 
 Comparison should include:
 
@@ -166,7 +178,7 @@ Comparison should include:
    - Efficiency metrics
 
 Please present the comparison in a clear, tabular format where possible, and highlight significant differences.`,
-		services, timeRange, metrics)
+		services, start, end, metrics)
 
 	return &mcp.GetPromptResult{
 		Description: "Service comparison analysis",
