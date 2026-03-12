@@ -484,7 +484,8 @@ Entity Filtering (all optional):
 - Relation queries: dest_service_name + dest_layer, dest_service_instance_name, etc.
 
 Examples:
-- {expression: "service_sla * 100", service_name: "Your_ApplicationName", layer: "GENERAL", start: "-1h", end: "now"}: Convert SLA to percentage for last hour
+- {expression: "service_sla * 100", service_name: "Your_ApplicationName", layer: "GENERAL",
+  start: "-1h", end: "now"}: Convert SLA to percentage for last hour
 - {expression: "service_resp_time > 3000 && service_cpm < 1000", service_name: "Your_ApplicationName", 
 	start: "-30m", end: "now"}: Find high latency with low traffic in last 30 minutes
 - {expression: "avg(service_cpm)", start: "-2h", end: "now"}: Calculate average CPM for last 2 hours

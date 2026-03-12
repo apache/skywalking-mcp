@@ -106,16 +106,15 @@ func urlAndInsecureFromConfig() (string, bool) {
 	return configuredSkyWalkingURL(), false
 }
 
-// urlAndInsecureFromHeaders extracts URL and insecure flag for a request.
+// urlFromHeaders extracts URL for a request.
 // URL is sourced from Header > configured value > Default.
-// Insecure flag is now hardcoded to false.
-func urlAndInsecureFromHeaders(req *http.Request) (string, bool) {
+func urlFromHeaders(req *http.Request) string {
 	urlStr := req.Header.Get("SW-URL")
 	if urlStr == "" {
-		return configuredSkyWalkingURL(), false
+		return configuredSkyWalkingURL()
 	}
 
-	return tools.FinalizeURL(urlStr), false
+	return tools.FinalizeURL(urlStr)
 }
 
 // WithSkyWalkingContextFromConfig injects the SkyWalking URL and insecure
@@ -127,7 +126,7 @@ var WithSkyWalkingContextFromConfig server.StdioContextFunc = func(ctx context.C
 
 // withSkyWalkingContextFromRequest is the shared logic for enriching context from an http.Request.
 func withSkyWalkingContextFromRequest(ctx context.Context, req *http.Request) context.Context {
-	urlStr, _ := urlAndInsecureFromHeaders(req)
+	urlStr := urlFromHeaders(req)
 	return WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
 }
 

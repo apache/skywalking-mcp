@@ -34,6 +34,8 @@ func AddEventTools(s *server.MCPServer) {
 	EventQueryTool.Register(s)
 }
 
+const orderASC = "ASC"
+
 type EventQueryRequest struct {
 	UUID            string `json:"uuid,omitempty"`
 	Service         string `json:"service,omitempty"`
@@ -86,7 +88,7 @@ func buildEventQueryCondition(req *EventQueryRequest, timeCtx TimeContext) *api.
 	}
 
 	order := api.OrderDes
-	if req.Order == "ASC" {
+	if req.Order == orderASC {
 		order = api.OrderAsc
 	}
 	cond.Order = &order
@@ -131,7 +133,7 @@ Examples:
 	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
 	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
 		mcp.Description("Time step granularity. If not specified, uses adaptive step sizing.")),
-	mcp.WithString("order", mcp.Enum("ASC", "DES"),
+	mcp.WithString("order", mcp.Enum(orderASC, "DES"),
 		mcp.Description("Order events by time: ASC (oldest first) or DES (newest first, default).")),
 	mcp.WithNumber("page_num", mcp.Description("Page number, default 1.")),
 	mcp.WithNumber("page_size", mcp.Description("Page size, default 15.")),

@@ -107,16 +107,20 @@ func addUtilityPrompts(s *server.MCPServer) {
 		Arguments: []mcp.PromptArgument{
 			{Name: "layer", Description: "The layer to explore (e.g. GENERAL, MESH, K8S). Use list_layers if unknown.", Required: true},
 			{Name: "start", Description: `Start time for the query. Examples: "2024-01-01 12:00:00", "-1h" (1 hour ago).`, Required: true},
-			{Name: "end", Description: `End time for the query. Examples: "2024-01-01 13:00:00", "now". Defaults to current time if omitted.`, Required: false},
+			{Name: "end", Description: `End time for the query. Examples: "2024-01-01 13:00:00", "now".` +
+				` Defaults to current time if omitted.`, Required: false},
 		},
 	}, exploreServiceTopologyHandler)
 
 	// Generate Duration Prompt
 	s.AddPrompt(mcp.Prompt{
-		Name:        "generate_duration",
-		Description: "Convert a natural-language time range into a {start, end} duration object for use with list_instances, list_endpoints, list_processes, and similar tools",
+		Name: "generate_duration",
+		Description: "Convert a natural-language time range into a {start, end} duration object" +
+			" for use with list_instances, list_endpoints, list_processes, and similar tools",
 		Arguments: []mcp.PromptArgument{
-			{Name: "time_range", Description: `Natural-language description of the desired time range. Examples: "last hour", "past 30 minutes", "yesterday 9am to 5pm", "2024-01-01 12:00 to 13:00"`, Required: true},
+			{Name: "time_range", Description: `Natural-language description of the desired time range.` +
+				` Examples: "last hour", "past 30 minutes", "yesterday 9am to 5pm", "2024-01-01 12:00 to 13:00"`,
+				Required: true},
 		},
 	}, generateDurationHandler)
 

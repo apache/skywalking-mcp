@@ -167,35 +167,46 @@ type TimeRange struct {
 	Duration  int64 `json:"duration_ms"`
 }
 
+type spanStats struct {
+	traceID   string
+	rootSpan  *api.Span
+	startTime int64
+	endTime   int64
+	isError   bool
+}
+
+func collectSpanStats(spans []*api.Span) spanStats {
+	var s spanStats
+	for _, span := range spans {
+		if span == nil {
+			continue
+		}
+		if span.SpanID == 0 && span.ParentSpanID == -1 && s.rootSpan == nil {
+			s.rootSpan = span
+		}
+		if s.traceID == "" {
+			s.traceID = span.TraceID
+		}
+		if s.startTime == 0 || span.StartTime < s.startTime {
+			s.startTime = span.StartTime
+		}
+		if span.EndTime > s.endTime {
+			s.endTime = span.EndTime
+		}
+		if span.IsError != nil && *span.IsError {
+			s.isError = true
+		}
+	}
+	return s
+}
+
 // createBasicTraceSummary creates a BasicTraceSummary from a TraceV2
 func createBasicTraceSummary(traceItem *api.TraceV2) BasicTraceSummary {
 	if traceItem == nil || len(traceItem.Spans) == 0 {
 		return BasicTraceSummary{}
 	}
-	var rootSpan *api.Span
-	var traceID string
-	var startTime, endTime int64
-	var isError bool
-	for _, span := range traceItem.Spans {
-		if span == nil {
-			continue
-		}
-		if span.SpanID == 0 && span.ParentSpanID == -1 && rootSpan == nil {
-			rootSpan = span
-		}
-		if traceID == "" {
-			traceID = span.TraceID
-		}
-		if startTime == 0 || span.StartTime < startTime {
-			startTime = span.StartTime
-		}
-		if span.EndTime > endTime {
-			endTime = span.EndTime
-		}
-		if span.IsError != nil && *span.IsError {
-			isError = true
-		}
-	}
+	stats := collectSpanStats(traceItem.Spans)
+	rootSpan := stats.rootSpan
 	if rootSpan == nil {
 		rootSpan = traceItem.Spans[0]
 	}
@@ -204,12 +215,12 @@ func createBasicTraceSummary(traceItem *api.TraceV2) BasicTraceSummary {
 		endpointName = *rootSpan.EndpointName
 	}
 	return BasicTraceSummary{
-		TraceID:      traceID,
+		TraceID:      stats.traceID,
 		ServiceName:  rootSpan.ServiceCode,
 		EndpointName: endpointName,
-		StartTime:    startTime,
-		Duration:     endTime - startTime,
-		IsError:      isError,
+		StartTime:    stats.startTime,
+		Duration:     stats.endTime - stats.startTime,
+		IsError:      stats.isError,
 		SpanCount:    len(traceItem.Spans),
 	}
 }
@@ -637,7 +648,8 @@ Examples:
 		mcp.Description("Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)"),
 	),
 	mcp.WithString("end",
-		mcp.Description("End time for the query. Examples: \"2023-01-01 13:00:00\", \"now\", \"-10m\" (10 minutes ago) Defaults to current time if omitted."),
+		mcp.Description("End time for the query. Examples: \"2023-01-01 13:00:00\", \"now\","+
+			" \"-10m\" (10 minutes ago) Defaults to current time if omitted."),
 	),
 	mcp.WithString("step",
 		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
