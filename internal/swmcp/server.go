@@ -18,31 +18,32 @@
 package swmcp
 
 import (
-	"context"
-	"fmt"
-	"net/http"
-	"os"
+"context"
+"fmt"
+"net/http"
+"os"
 
-	"github.com/mark3labs/mcp-go/server"
-	"github.com/sirupsen/logrus"
+"github.com/mark3labs/mcp-go/server"
+"github.com/sirupsen/logrus"
+"github.com/spf13/viper"
 
-	"github.com/apache/skywalking-cli/pkg/contextkey"
+"github.com/apache/skywalking-cli/pkg/contextkey"
 
-	"github.com/apache/skywalking-mcp/internal/config"
-	"github.com/apache/skywalking-mcp/internal/prompts"
-	"github.com/apache/skywalking-mcp/internal/resources"
-	"github.com/apache/skywalking-mcp/internal/tools"
+"github.com/apache/skywalking-mcp/internal/config"
+"github.com/apache/skywalking-mcp/internal/prompts"
+"github.com/apache/skywalking-mcp/internal/resources"
+"github.com/apache/skywalking-mcp/internal/tools"
 )
 
 // newMcpServer creates a new MCP server instance,
 // and we can add various tools and capabilities to it.
 func newMcpServer() *server.MCPServer {
 	mcpServer := server.NewMCPServer(
-		"skywalking-mcp",
-		"0.1.0",
-		server.WithResourceCapabilities(true, true),
-		server.WithPromptCapabilities(true),
-		server.WithLogging())
+"skywalking-mcp",
+"0.1.0",
+server.WithResourceCapabilities(true, true),
+server.WithPromptCapabilities(true),
+server.WithLogging())
 
 	// add tools and capabilities to the MCP server
 	tools.AddTraceTools(mcpServer)
@@ -88,38 +89,38 @@ func WithSkyWalkingURLAndInsecure(ctx context.Context, url string, insecure bool
 	return ctx
 }
 
-const (
-	skywalkingURLEnvVar = "SW_URL"
-)
-
-// urlAndInsecureFromEnv extracts URL and insecure flag purely from environment variables.
-func urlAndInsecureFromEnv() (string, bool) {
-	urlStr := os.Getenv(skywalkingURLEnvVar)
+// configuredSkyWalkingURL returns the configured SkyWalking OAP URL.
+// The value is sourced from the CLI/config binding for `--sw-url`,
+// falling back to the built-in default when unset.
+func configuredSkyWalkingURL() string {
+	urlStr := viper.GetString("url")
 	if urlStr == "" {
 		urlStr = config.DefaultSWURL
 	}
-	return tools.FinalizeURL(urlStr), false
+	return tools.FinalizeURL(urlStr)
+}
+
+// urlAndInsecureFromConfig extracts URL and insecure flag from global configuration.
+func urlAndInsecureFromConfig() (string, bool) {
+	return configuredSkyWalkingURL(), false
 }
 
 // urlAndInsecureFromHeaders extracts URL and insecure flag for a request.
-// URL is sourced from Header > Environment > Default.
+// URL is sourced from Header > configured value > Default.
 // Insecure flag is now hardcoded to false.
 func urlAndInsecureFromHeaders(req *http.Request) (string, bool) {
 	urlStr := req.Header.Get("SW-URL")
 	if urlStr == "" {
-		urlStr = os.Getenv(skywalkingURLEnvVar)
-		if urlStr == "" {
-			urlStr = config.DefaultSWURL
-		}
+		return configuredSkyWalkingURL(), false
 	}
 
 	return tools.FinalizeURL(urlStr), false
 }
 
-// WithSkyWalkingContextFromEnv injects the SkyWalking URL and insecure
-// settings from environment variables into the context.
-var WithSkyWalkingContextFromEnv server.StdioContextFunc = func(ctx context.Context) context.Context {
-	urlStr, _ := urlAndInsecureFromEnv()
+// WithSkyWalkingContextFromConfig injects the SkyWalking URL and insecure
+// settings from global configuration into the context.
+var WithSkyWalkingContextFromConfig server.StdioContextFunc = func(ctx context.Context) context.Context {
+	urlStr, _ := urlAndInsecureFromConfig()
 	return WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
 }
 
@@ -130,9 +131,9 @@ func withSkyWalkingContextFromRequest(ctx context.Context, req *http.Request) co
 }
 
 // EnhanceStdioContextFunc returns a StdioContextFunc that enriches the context
-// with SkyWalking settings from the environment.
+// with SkyWalking settings from the global configuration.
 func EnhanceStdioContextFunc() server.StdioContextFunc {
-	return WithSkyWalkingContextFromEnv
+	return WithSkyWalkingContextFromConfig
 }
 
 // EnhanceSSEContextFunc returns a SSEContextFunc that enriches the context

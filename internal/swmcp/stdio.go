@@ -44,7 +44,7 @@ func NewStdioServer() *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			url := viper.GetString("url")
 			if url == "" {
-				return errors.New("SW_URL must be specified")
+				return errors.New("--sw-url must be specified")
 			}
 
 			stdioServerConfig := config.StdioServerConfig{

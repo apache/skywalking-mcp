@@ -86,12 +86,9 @@ If using Docker:
         "run",
         "--rm",
         "-i",
-        "-e",
-        "SW_URL",
-        "skywalking-mcp:latest"
-      ],
-      "env": {
-        "SW_URL": "http://localhost:12800"
+		"skywalking-mcp:latest",
+		"--sw-url",
+		"http://localhost:12800"
       }
     }
   }
