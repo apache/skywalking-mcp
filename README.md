@@ -101,7 +101,7 @@ SkyWalking MCP provides the following tools to query and analyze SkyWalking OAP 
 
 | Category     | Tool Name                      | Description                                                                                       |
 |--------------|--------------------------------|---------------------------------------------------------------------------------------------------|
-| **Trace**    | `query_traces`                 | Query traces with multi-condition filtering (service, endpoint, duration, state, tags). Supports `full`, `summary`, and `errors_only` views with performance insights. |
+| **Trace**    | `query_traces`                 | Query traces with multi-condition filtering (service, endpoint, state, tags, and time range via start/end/step). Supports `full`, `summary`, and `errors_only` views with performance insights. |
 | **Log**      | `query_logs`                   | Query logs with filters for service, instance, endpoint, trace ID, tags, and time range. Supports cold storage and pagination. |
 | **MQE**      | `execute_mqe_expression`       | Execute MQE (Metrics Query Expression) to query and calculate metrics data. Supports calculations, aggregations, TopN, trend analysis, and multiple result types. |
 | **MQE**      | `list_mqe_metrics`             | List available metrics for MQE queries. Filter by regex pattern; returns metric name, type, and catalog. |
