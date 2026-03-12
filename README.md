@@ -89,7 +89,7 @@ If using Docker:
 		"skywalking-mcp:latest",
 		"--sw-url",
 		"http://localhost:12800"
-      }
+      ]
     }
   }
 }
