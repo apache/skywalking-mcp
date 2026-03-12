@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Build stage
-FROM golang:1.24-bullseye AS builder
+FROM golang:1.25-bullseye AS builder
 
 # Default version
 ARG VERSION="dev"
