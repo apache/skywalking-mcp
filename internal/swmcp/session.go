@@ -112,11 +112,13 @@ func AddSessionTools(s *server.MCPServer) {
 	tool := tools.NewTool(
 		"set_skywalking_url",
 		`Set the SkyWalking OAP server URL and optional basic auth credentials for this session.
+This tool is only available in stdio transport mode.
 
 This tool configures the connection to SkyWalking OAP for all subsequent tool calls in the current session.
 The URL and credentials persist for the lifetime of the session.
 
 Priority: session URL (set by this tool) > --sw-url flag > default (http://localhost:12800/graphql)
+For SSE/HTTP transports, use the SW-URL HTTP header or --sw-url flag instead.
 
 Credentials support raw values or environment variable references using ${ENV_VAR} syntax.
 
