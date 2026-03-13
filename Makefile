@@ -92,18 +92,20 @@ clean:
 build-image: ## Build the Docker image.
 	docker build -t $(APP_NAME):latest .
 
+.PHONY: docker-build
+docker-build: ## Build the Docker image (local only).
+	docker build --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
+
+.PHONY: docker-push
+docker-push: ## Push existing Docker images to the registry.
+	docker push $(HUB)/$(APP_NAME):$(VERSION)
+	docker push $(HUB)/$(APP_NAME):latest
+
 .PHONY: docker
-docker: PUSH_OR_LOAD = --load
-docker: PLATFORMS =
+docker: docker-build
 
 .PHONY: docker.push
-docker.push: PUSH_OR_LOAD = --push
-docker.push: PLATFORMS = --platform linux/amd64,linux/arm64
-
-docker docker.push:
-	docker buildx create --use --driver docker-container --name skywalking_mcp > /dev/null 2>&1 || true
-	docker buildx build $(PUSH_OR_LOAD) $(PLATFORMS) --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
-	docker buildx rm skywalking_mcp
+docker.push: docker-push
 
 ## Release
 RELEASE_SCRIPTS := ./scripts/release.sh
@@ -120,7 +122,7 @@ release-sign: ## Sign artifacts
 release-assembly: release-binary release-sign ## Generate release package
 
 PUSH_RELEASE_SCRIPTS := ./scripts/push-release.sh
-release-push-candidate: ## Push release candidate
+release-push-candidate:
 	${PUSH_RELEASE_SCRIPTS}
 
 .PHONY: license-header fix-license-header dependency-license fix-dependency-license
