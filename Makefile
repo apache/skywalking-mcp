@@ -39,10 +39,6 @@ build: ## Build the binary.
 		-X ${VERSION_PATH}.date=${BUILD_DATE}" \
 		-o bin/swmcp cmd/skywalking-mcp/main.go
 
-.PHONY: build-image
-build-image: ## Build the Docker image.
-	docker build -t skywalking-mcp:latest .
-
 $(GO_LINT):
 	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0
 $(LICENSE_EYE):
@@ -56,15 +52,16 @@ fix-lint: $(GO_LINT)
 	$(GO_LINT) run -v --fix ./...
 
 .PHONY: license-header
-license-header: clean $(LICENSE_EYE)
+license-header: $(LICENSE_EYE)
 	@$(LICENSE_EYE) header check
 
 .PHONY: fix-license-header
-fix-license-header: clean $(LICENSE_EYE)
+fix-license-header: $(LICENSE_EYE)
 	@$(LICENSE_EYE) header fix
 
 .PHONY: dependency-license
-dependency-license: clean $(LICENSE_EYE)
+dependency-license: $(LICENSE_EYE)
+	@rm	 -rf ./dist/licenses
 	@$(LICENSE_EYE) dependency resolve --summary ./dist/LICENSE.tpl --output ./dist/licenses || exit 1
 	@if [ ! -z "`git diff -U0 ./dist`" ]; then \
 		echo "LICENSE file is not updated correctly"; \
@@ -73,7 +70,7 @@ dependency-license: clean $(LICENSE_EYE)
 	fi
 
 .PHONY: fix-dependency-license
-fix-dependency-license: clean $(LICENSE_EYE)
+fix-dependency-license: $(LICENSE_EYE)
 	@$(LICENSE_EYE) dependency resolve --summary ./dist/LICENSE.tpl --output ./dist/licenses
 
 .PHONY: fix-license
@@ -92,15 +89,33 @@ clean:
 	-rm -rf *.sha512
 	@go mod tidy &> /dev/null
 
+.PHONY: build-image
+build-image: ## Build the Docker image.
+	docker build -t $(APP_NAME):latest .
+
 .PHONY: docker
 docker: PUSH_OR_LOAD = --load
 docker: PLATFORMS =
 
 .PHONY: docker.push
 docker.push: PUSH_OR_LOAD = --push
-docker.push: PLATFORMS = --platform linux/386,linux/amd64,linux/arm64
+docker.push: PLATFORMS = --platform linux/amd64,linux/arm64
 
 docker docker.push:
 	docker buildx create --use --driver docker-container --name skywalking_mcp > /dev/null 2>&1 || true
 	docker buildx build $(PUSH_OR_LOAD) $(PLATFORMS) --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
 	docker buildx rm skywalking_mcp
+
+## Release
+RELEASE_SCRIPTS := ./scripts/release.sh
+
+release-binary: release-source ## Package binary archive
+	${RELEASE_SCRIPTS} -b
+
+release-source: ## Package source archive
+	${RELEASE_SCRIPTS} -s
+
+release-sign: ## Sign artifacts
+	${RELEASE_SCRIPTS} -k
+
+release-assembly: release-binary release-sign ## Generate release package
