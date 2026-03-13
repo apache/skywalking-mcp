@@ -57,6 +57,8 @@ func init() {
 
 	// Add global Flags
 	rootCmd.PersistentFlags().String("sw-url", "", "Specify the OAP URL to connect to (e.g. http://localhost:12800)")
+	rootCmd.PersistentFlags().String("sw-username", "", "Username for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)")
+	rootCmd.PersistentFlags().String("sw-password", "", "Password for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)")
 	rootCmd.PersistentFlags().String("log-level", "info", "Logging level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().Bool("read-only", false, "Restrict the server to read-only operations")
 	rootCmd.PersistentFlags().Bool("log-command", false, "When true, log commands to the log file")
@@ -64,6 +66,8 @@ func init() {
 
 	// Bind flag to viper
 	_ = viper.BindPFlag("url", rootCmd.PersistentFlags().Lookup("sw-url"))
+	_ = viper.BindPFlag("username", rootCmd.PersistentFlags().Lookup("sw-username"))
+	_ = viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("sw-password"))
 	_ = viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
 	_ = viper.BindPFlag("read-only", rootCmd.PersistentFlags().Lookup("read-only"))
 	_ = viper.BindPFlag("log-command", rootCmd.PersistentFlags().Lookup("log-command"))

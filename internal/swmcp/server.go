@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/sirupsen/logrus"
@@ -43,6 +44,7 @@ func newMCPServer() *server.MCPServer {
 		server.WithPromptCapabilities(true),
 		server.WithLogging(),
 	)
+	AddSessionTools(s)
 	tools.AddTraceTools(s)
 	tools.AddLogTools(s)
 	tools.AddMQETools(s)
@@ -73,11 +75,18 @@ func initLogger(logFilePath string) (*logrus.Logger, error) {
 	return logrusLogger, nil
 }
 
-// WithSkyWalkingURLAndInsecure adds SkyWalking URL and insecure flag to the context
-// This ensures all downstream requests will have contextkey.BaseURL{} and contextkey.Insecure{}
+// WithSkyWalkingURLAndInsecure adds SkyWalking URL and insecure flag to the context.
+// This ensures all downstream requests will have contextkey.BaseURL{} and contextkey.Insecure{}.
 func WithSkyWalkingURLAndInsecure(ctx context.Context, url string, insecure bool) context.Context {
 	ctx = context.WithValue(ctx, contextkey.BaseURL{}, url)
 	ctx = context.WithValue(ctx, contextkey.Insecure{}, insecure)
+	return ctx
+}
+
+// WithSkyWalkingAuth adds username and password to the context for basic auth.
+func WithSkyWalkingAuth(ctx context.Context, username, password string) context.Context {
+	ctx = context.WithValue(ctx, contextkey.Username{}, username)
+	ctx = context.WithValue(ctx, contextkey.Password{}, password)
 	return ctx
 }
 
@@ -92,6 +101,32 @@ func configuredSkyWalkingURL() string {
 	return tools.FinalizeURL(urlStr)
 }
 
+// resolveEnvVar resolves a value that may contain an environment variable reference
+// in the form ${VAR_NAME}. If the value matches this pattern, it returns the
+// environment variable's value. Otherwise, it returns the raw value as-is.
+func resolveEnvVar(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if strings.HasPrefix(trimmed, "${") && strings.HasSuffix(trimmed, "}") {
+		envName := trimmed[2 : len(trimmed)-1]
+		return os.Getenv(envName)
+	}
+	return value
+}
+
+// configuredAuth returns the configured username and password from CLI flags or env vars.
+func configuredAuth() (username, password string) {
+	return resolveEnvVar(viper.GetString("username")), resolveEnvVar(viper.GetString("password"))
+}
+
+// withConfiguredAuth injects the configured auth credentials into the context if present.
+func withConfiguredAuth(ctx context.Context) context.Context {
+	username, password := configuredAuth()
+	if username != "" {
+		ctx = WithSkyWalkingAuth(ctx, username, password)
+	}
+	return ctx
+}
+
 // urlFromHeaders extracts URL for a request.
 // URL is sourced from Header > configured value > Default.
 func urlFromHeaders(req *http.Request) string {
@@ -103,32 +138,59 @@ func urlFromHeaders(req *http.Request) string {
 	return tools.FinalizeURL(urlStr)
 }
 
-// WithSkyWalkingContextFromConfig injects the SkyWalking URL and insecure
-// settings from global configuration into the context.
-var WithSkyWalkingContextFromConfig server.StdioContextFunc = func(ctx context.Context) context.Context {
-	return WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
-}
-
-// withSkyWalkingContextFromRequest is the shared logic for enriching context from an http.Request.
-func withSkyWalkingContextFromRequest(ctx context.Context, req *http.Request) context.Context {
-	urlStr := urlFromHeaders(req)
-	return WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
+// applySessionOverrides checks for a session in the context and applies any
+// URL or auth overrides that were set via the set_skywalking_url tool.
+func applySessionOverrides(ctx context.Context) context.Context {
+	session := SessionFromContext(ctx)
+	if session == nil {
+		return ctx
+	}
+	if url := session.URL(); url != "" {
+		ctx = context.WithValue(ctx, contextkey.BaseURL{}, url)
+	}
+	if username := session.Username(); username != "" {
+		ctx = WithSkyWalkingAuth(ctx, username, session.Password())
+	}
+	return ctx
 }
 
 // EnhanceStdioContextFunc returns a StdioContextFunc that enriches the context
-// with SkyWalking settings from the global configuration.
+// with SkyWalking settings from the global configuration and a per-session store.
 func EnhanceStdioContextFunc() server.StdioContextFunc {
-	return WithSkyWalkingContextFromConfig
+	session := &Session{}
+	return func(ctx context.Context) context.Context {
+		ctx = WithSession(ctx, session)
+		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
+		ctx = withConfiguredAuth(ctx)
+		ctx = applySessionOverrides(ctx)
+		return ctx
+	}
 }
 
 // EnhanceSSEContextFunc returns a SSEContextFunc that enriches the context
-// with SkyWalking settings from SSE request headers.
+// with SkyWalking settings from SSE request headers and a per-session store.
 func EnhanceSSEContextFunc() server.SSEContextFunc {
-	return withSkyWalkingContextFromRequest
+	session := &Session{}
+	return func(ctx context.Context, req *http.Request) context.Context {
+		ctx = WithSession(ctx, session)
+		urlStr := urlFromHeaders(req)
+		ctx = WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
+		ctx = withConfiguredAuth(ctx)
+		ctx = applySessionOverrides(ctx)
+		return ctx
+	}
 }
 
 // EnhanceHTTPContextFunc returns a HTTPContextFunc that enriches the context
-// with SkyWalking settings from HTTP request headers.
+// with SkyWalking settings from HTTP request headers and a per-session store.
 func EnhanceHTTPContextFunc() server.HTTPContextFunc {
-	return withSkyWalkingContextFromRequest
+	session := &Session{}
+	return func(ctx context.Context, req *http.Request) context.Context {
+		ctx = WithSession(ctx, session)
+		urlStr := urlFromHeaders(req)
+		ctx = WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
+		ctx = withConfiguredAuth(ctx)
+		ctx = applySessionOverrides(ctx)
+		return ctx
+	}
 }
