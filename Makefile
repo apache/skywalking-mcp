@@ -34,7 +34,7 @@ all: build ;
 build: ## Build the binary.
 	${MKDIR_P} bin/
 	CGO_ENABLED=0 go build -ldflags "\
-	    -X ${VERSION_PATH}.version=${VERSION} \
+	  -X ${VERSION_PATH}.version=${VERSION} \
 		-X ${VERSION_PATH}.commit=${GIT_COMMIT} \
 		-X ${VERSION_PATH}.date=${BUILD_DATE}" \
 		-o bin/swmcp cmd/skywalking-mcp/main.go
@@ -84,7 +84,6 @@ clean:
 	-rm -rf bin
 	-rm -rf coverage.txt
 	-rm -rf *.tgz
-	-rm -rf *.tgz
 	-rm -rf *.asc
 	-rm -rf *.sha512
 	@go mod tidy &> /dev/null
@@ -116,6 +115,14 @@ release-source: ## Package source archive
 	${RELEASE_SCRIPTS} -s
 
 release-sign: ## Sign artifacts
-	${RELEASE_SCRIPTS} -k
+	${RELEASE_SCRIPTS} -k mcp
 
 release-assembly: release-binary release-sign ## Generate release package
+
+PUSH_RELEASE_SCRIPTS := ./scripts/push-release.sh
+release-push-candidate: ## Push release candidate
+	${PUSH_RELEASE_SCRIPTS}
+
+.PHONY: license-header fix-license-header dependency-license fix-dependency-license
+.PHONY: release-binary release-source release-sign release-assembly
+.PHONY: release-push-candidate

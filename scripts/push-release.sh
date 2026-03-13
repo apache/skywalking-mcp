@@ -24,7 +24,7 @@ fi
 
 VERSION=${VERSION}
 TAG_NAME=v${VERSION}
-PRODUCT_NAME="skywalking-banyandb-${VERSION}"
+PRODUCT_NAME="skywalking-mcp-${VERSION}"
 
 echo "Release version "${VERSION}
 echo "Source tag "${TAG_NAME}
@@ -39,34 +39,32 @@ trap 'popd' EXIT
 rm -rf skywalking
 
 svn co https://dist.apache.org/repos/dist/dev/skywalking/
-mkdir -p skywalking/banyandb/"$VERSION"
-cp ${PRODUCT_NAME}-*.tgz skywalking/banyandb/"$VERSION"
-cp ${PRODUCT_NAME}-*.tgz.asc skywalking/banyandb/"$VERSION"
-cp ${PRODUCT_NAME}-*.tgz.sha512 skywalking/banyandb/"$VERSION"
+mkdir -p skywalking/mcp/"$VERSION"
+cp ${PRODUCT_NAME}-*.tgz skywalking/mcp/"$VERSION"
+cp ${PRODUCT_NAME}-*.tgz.asc skywalking/mcp/"$VERSION"
+cp ${PRODUCT_NAME}-*.tgz.sha512 skywalking/mcp/"$VERSION"
 
-cd skywalking/banyandb && svn add "$VERSION" && svn commit -m "Draft Apache SkyWalking BanyanDB release $VERSION"
+cd skywalking/mcp && svn add "$VERSION" && svn commit -m "Draft Apache SkyWalking MCP release $VERSION"
 cd "$VERSION"
 
 cat << EOF
 =========================================================================
-Subject: [VOTE] Release Apache SkyWalking BanyanDB version $VERSION
+Subject: [VOTE] Release Apache SkyWalking MCP version $VERSION
 
 Content:
 
 Hi the SkyWalking Community:
-This is a call for vote to release Apache SkyWalking BanyanDB version $VERSION.
+This is a call for vote to release Apache SkyWalking MCP version $VERSION.
 
 Release notes:
 
- * https://github.com/apache/skywalking-banyandb/blob/v$VERSION/CHANGES.md
+ * https://github.com/apache/skywalking-mcp/blob/v$VERSION/CHANGES.md
 
 Release Candidate:
 
- * https://dist.apache.org/repos/dist/dev/skywalking/banyandb/$VERSION
+ * https://dist.apache.org/repos/dist/dev/skywalking/mcp/$VERSION
  * sha512 checksums
-   - $(cat ${PRODUCT_NAME}-src.tgz.sha512)
-   - $(cat ${PRODUCT_NAME}-banyand.tgz.sha512)
-   - $(cat ${PRODUCT_NAME}-bydbctl.tgz.sha512)
+   - $(cat ${PRODUCT_NAME}-mcp.tgz.sha512)
 
 Release Tag :
 
@@ -74,7 +72,7 @@ Release Tag :
 
 Release Commit Hash :
 
- * https://github.com/apache/skywalking-banyandb/tree/$(git rev-list -n 1 "$TAG_NAME")
+ * https://github.com/apache/skywalking-mcp/tree/$(git rev-list -n 1 "$TAG_NAME")
 
 Keys to verify the Release Candidate :
 
@@ -82,7 +80,7 @@ Keys to verify the Release Candidate :
 
 Guide to build the release from source :
 
- * https://github.com/apache/skywalking-banyandb/blob/v$VERSION/docs/installation/binaries.md#Build-From-Source
+ * https://github.com/apache/skywalking-mcp/blob/v$VERSION/README.md
 
 Voting will start now and will remain open for at least 72 hours, all PMC members are required to give their votes.
 

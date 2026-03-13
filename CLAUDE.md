@@ -41,7 +41,7 @@ No unit tests exist yet. CI runs license checks, lint, and docker build.
 Three MCP transport modes as cobra subcommands: `stdio`, `sse`, `streamable`.
 
 The SkyWalking OAP URL is resolved in priority order:
-`--sw-url` flag > `SW_URL` env > `SW-URL` HTTP header > `http://localhost:12800/graphql`
+`--sw-url` flag > `SW-URL` HTTP header > `http://localhost:12800/graphql`
 
 Each transport injects the OAP URL into the request context via `WithSkyWalkingURLAndInsecure()`. Tools extract it downstream using `skywalking-cli`'s `contextkey.BaseURL{}`.
 
