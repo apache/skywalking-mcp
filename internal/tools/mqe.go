@@ -20,6 +20,7 @@ package tools
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,7 +30,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/spf13/viper"
+
+	"github.com/apache/skywalking-cli/pkg/contextkey"
 )
 
 // AddMQETools registers MQE-related tools with the MCP server
@@ -53,8 +55,17 @@ type GraphQLResponse struct {
 	} `json:"errors,omitempty"`
 }
 
-// executeGraphQL executes a GraphQL query against SkyWalking OAP
-func executeGraphQL(ctx context.Context, url, query string, variables map[string]interface{}) (*GraphQLResponse, error) {
+// getContextString safely extracts a string value from context.
+func getContextString(ctx context.Context, key any) string {
+	if v, ok := ctx.Value(key).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// executeGraphQLWithContext executes a GraphQL query using URL and auth from context.
+func executeGraphQLWithContext(ctx context.Context, query string, variables map[string]interface{}) (*GraphQLResponse, error) {
+	url := getContextString(ctx, contextkey.BaseURL{})
 	url = FinalizeURL(url)
 
 	reqBody := GraphQLRequest{
@@ -73,6 +84,14 @@ func executeGraphQL(ctx context.Context, url, query string, variables map[string
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+
+	// Add basic auth from context if present
+	username := getContextString(ctx, contextkey.Username{})
+	password := getContextString(ctx, contextkey.Password{})
+	if username != "" && password != "" {
+		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
+		req.Header.Set("Authorization", auth)
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -186,7 +205,7 @@ func getServiceByName(ctx context.Context, serviceName, layer string) (*bool, er
 		"serviceId": serviceID,
 	}
 
-	result, err := executeGraphQL(ctx, viper.GetString("url"), query, variables)
+	result, err := executeGraphQLWithContext(ctx, query, variables)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -217,7 +236,7 @@ func findServiceID(ctx context.Context, serviceName, layer string) (string, erro
 		"layer": layer,
 	}
 
-	result, err := executeGraphQL(ctx, viper.GetString("url"), query, variables)
+	result, err := executeGraphQLWithContext(ctx, query, variables)
 	if err != nil {
 		return "", err
 	}
@@ -353,7 +372,7 @@ func executeMQEExpression(ctx context.Context, req *MQEExpressionRequest) (*mcp.
 		"dumpDBRsp": req.DumpDBRsp,
 	}
 
-	result, err := executeGraphQL(ctx, viper.GetString("url"), query, variables)
+	result, err := executeGraphQLWithContext(ctx, query, variables)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to execute MQE expression: %v", err)), nil
 	}
@@ -383,7 +402,7 @@ func listMQEMetrics(ctx context.Context, req *MQEMetricsListRequest) (*mcp.CallT
 		variables["regex"] = req.Regex
 	}
 
-	result, err := executeGraphQL(ctx, viper.GetString("url"), query, variables)
+	result, err := executeGraphQLWithContext(ctx, query, variables)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to list metrics: %v", err)), nil
 	}
@@ -431,7 +450,7 @@ func getMQEMetricsType(ctx context.Context, req *MQEMetricsTypeRequest) (*mcp.Ca
 		"name": req.MetricName,
 	}
 
-	result, err := executeGraphQL(ctx, viper.GetString("url"), query, variables)
+	result, err := executeGraphQLWithContext(ctx, query, variables)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get metric type: %v", err)), nil
 	}

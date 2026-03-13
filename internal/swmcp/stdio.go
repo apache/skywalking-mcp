@@ -19,7 +19,6 @@ package swmcp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -42,13 +41,8 @@ func NewStdioServer() *cobra.Command {
 		Short: "Start stdio server",
 		Long:  `Start a server that communicates via standard input/output streams using JSON-RPC messages.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			url := viper.GetString("url")
-			if url == "" {
-				return errors.New("--sw-url must be specified")
-			}
-
 			stdioServerConfig := config.StdioServerConfig{
-				URL:         url,
+				URL:         viper.GetString("url"),
 				ReadOnly:    viper.GetBool("read-only"),
 				LogFilePath: viper.GetString("log-file"),
 				LogCommands: viper.GetBool("log-command"),
