@@ -41,9 +41,11 @@ No unit tests exist yet. CI runs license checks, lint, and docker build.
 Three MCP transport modes as cobra subcommands: `stdio`, `sse`, `streamable`.
 
 The SkyWalking OAP URL is resolved in priority order:
-`--sw-url` flag > `SW_URL` env > `SW-URL` HTTP header > `http://localhost:12800/graphql`
+`set_skywalking_url` session tool > `--sw-url` flag > `SW-URL` HTTP header > `http://localhost:12800/graphql`
 
-Each transport injects the OAP URL into the request context via `WithSkyWalkingURLAndInsecure()`. Tools extract it downstream using `skywalking-cli`'s `contextkey.BaseURL{}`.
+Basic auth is configured via `--sw-username` / `--sw-password` flags. Both flags (and the `set_skywalking_url` tool) support `${ENV_VAR}` syntax to resolve credentials from environment variables (e.g. `--sw-password ${MY_SECRET}`).
+
+Each transport injects the OAP URL and auth into the request context via `WithSkyWalkingURLAndInsecure()` and `WithSkyWalkingAuth()`. Tools extract them downstream using `skywalking-cli`'s `contextkey.BaseURL{}`, `contextkey.Username{}`, and `contextkey.Password{}`.
 
 ### Server Wiring (`internal/swmcp/server.go`)
 

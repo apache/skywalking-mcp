@@ -36,13 +36,15 @@ Available Commands:
   streamable  Start Streamable server
 
 Flags:
-  -h, --help               help for swmcp
-      --log-command        When true, log commands to the log file
-      --log-file string    Path to log file
-      --log-level string   Logging level (debug, info, warn, error) (default "info")
-      --read-only          Restrict the server to read-only operations
-      --sw-url string      Specify the OAP URL to connect to (e.g. http://localhost:12800)
-  -v, --version            version for swmcp
+  -h, --help                 help for swmcp
+      --log-command          When true, log commands to the log file
+      --log-file string      Path to log file
+      --log-level string     Logging level (debug, info, warn, error) (default "info")
+      --read-only            Restrict the server to read-only operations
+      --sw-url string        Specify the OAP URL to connect to (e.g. http://localhost:12800)
+      --sw-username string   Username for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)
+      --sw-password string   Password for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)
+  -v, --version              version for swmcp
 
 Use "swmcp [command] --help" for more information about a command.
 ```
@@ -52,6 +54,12 @@ You could start the MCP server with the following command:
 ```bash
 # use stdio server
 bin/swmcp stdio --sw-url http://localhost:12800
+
+# with basic auth (raw password)
+bin/swmcp stdio --sw-url http://localhost:12800 --sw-username admin --sw-password admin
+
+# with basic auth (password from environment variable)
+bin/swmcp stdio --sw-url http://localhost:12800 --sw-username admin --sw-password '${SW_PASSWORD}'
 
 # or use SSE server
 bin/swmcp sse --sse-address localhost:8000 --base-path /mcp --sw-url http://localhost:12800
@@ -65,8 +73,9 @@ bin/swmcp sse --sse-address localhost:8000 --base-path /mcp --sw-url http://loca
     "skywalking": {
       "command": "swmcp stdio",
       "args": [
-        "--sw-url",
-        "http://localhost:12800"
+        "--sw-url", "http://localhost:12800",
+        "--sw-username", "admin",
+        "--sw-password", "${SW_PASSWORD}"
       ]
     }
   }
@@ -101,6 +110,7 @@ SkyWalking MCP provides the following tools to query and analyze SkyWalking OAP 
 
 | Category     | Tool Name                      | Description                                                                                       |
 |--------------|--------------------------------|---------------------------------------------------------------------------------------------------|
+| **Session**  | `set_skywalking_url`           | Set the SkyWalking OAP server URL and optional basic auth credentials for the current session. Supports `${ENV_VAR}` syntax for credentials. |
 | **Trace**    | `query_traces`                 | Query traces with multi-condition filtering (service, endpoint, state, tags, and time range via start/end/step). Supports `full`, `summary`, and `errors_only` views with performance insights. |
 | **Log**      | `query_logs`                   | Query logs with filters for service, instance, endpoint, trace ID, tags, and time range. Supports cold storage and pagination. |
 | **MQE**      | `execute_mqe_expression`       | Execute MQE (Metrics Query Expression) to query and calculate metrics data. Supports calculations, aggregations, TopN, trend analysis, and multiple result types. |

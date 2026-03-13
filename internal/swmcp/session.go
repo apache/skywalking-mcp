@@ -98,7 +98,7 @@ func setSkyWalkingURL(ctx context.Context, req *SetSkyWalkingURLRequest) (*mcp.C
 	}
 
 	finalURL := tools.FinalizeURL(req.URL)
-	session.SetConnection(finalURL, req.Username, req.Password)
+	session.SetConnection(finalURL, resolveEnvVar(req.Username), resolveEnvVar(req.Password))
 
 	msg := fmt.Sprintf("SkyWalking URL set to %s", finalURL)
 	if req.Username != "" {
@@ -116,19 +116,21 @@ func AddSessionTools(s *server.MCPServer) {
 This tool configures the connection to SkyWalking OAP for all subsequent tool calls in the current session.
 The URL and credentials persist for the lifetime of the session.
 
-Priority: session URL (set by this tool) > --sw-url flag > SW_URL env > default (localhost:12800)
+Priority: session URL (set by this tool) > --sw-url flag > default (http://localhost:12800/graphql)
+
+Credentials support raw values or environment variable references using ${ENV_VAR} syntax.
 
 Examples:
 - {"url": "http://demo.skywalking.apache.org:12800"}: Connect without auth
 - {"url": "http://oap.internal:12800", "username": "admin", "password": "admin"}: Connect with basic auth
-- {"url": "https://skywalking.example.com:443", "username": "skywalking", "password": "skywalking"}: HTTPS with auth`,
+- {"url": "https://skywalking.example.com:443", "username": "${SW_USER}", "password": "${SW_PASS}"}: Auth via env vars`,
 		setSkyWalkingURL,
 		mcp.WithString("url", mcp.Required(),
 			mcp.Description("SkyWalking OAP server URL (required). Example: http://localhost:12800")),
 		mcp.WithString("username",
-			mcp.Description("Username for basic auth (optional)")),
+			mcp.Description("Username for basic auth (optional). Supports ${ENV_VAR} syntax.")),
 		mcp.WithString("password",
-			mcp.Description("Password for basic auth (optional)")),
+			mcp.Description("Password for basic auth (optional). Supports ${ENV_VAR} syntax.")),
 	)
 	tool.Register(s)
 }

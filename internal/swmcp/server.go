@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/sirupsen/logrus"
@@ -100,9 +101,21 @@ func configuredSkyWalkingURL() string {
 	return tools.FinalizeURL(urlStr)
 }
 
+// resolveEnvVar resolves a value that may contain an environment variable reference
+// in the form ${VAR_NAME}. If the value matches this pattern, it returns the
+// environment variable's value. Otherwise, it returns the raw value as-is.
+func resolveEnvVar(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if strings.HasPrefix(trimmed, "${") && strings.HasSuffix(trimmed, "}") {
+		envName := trimmed[2 : len(trimmed)-1]
+		return os.Getenv(envName)
+	}
+	return value
+}
+
 // configuredAuth returns the configured username and password from CLI flags or env vars.
 func configuredAuth() (username, password string) {
-	return viper.GetString("username"), viper.GetString("password")
+	return resolveEnvVar(viper.GetString("username")), resolveEnvVar(viper.GetString("password"))
 }
 
 // withConfiguredAuth injects the configured auth credentials into the context if present.

@@ -57,8 +57,8 @@ func init() {
 
 	// Add global Flags
 	rootCmd.PersistentFlags().String("sw-url", "", "Specify the OAP URL to connect to (e.g. http://localhost:12800)")
-	rootCmd.PersistentFlags().String("sw-username", "", "Username for basic auth to SkyWalking OAP")
-	rootCmd.PersistentFlags().String("sw-password", "", "Password for basic auth to SkyWalking OAP")
+	rootCmd.PersistentFlags().String("sw-username", "", "Username for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)")
+	rootCmd.PersistentFlags().String("sw-password", "", "Password for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)")
 	rootCmd.PersistentFlags().String("log-level", "info", "Logging level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().Bool("read-only", false, "Restrict the server to read-only operations")
 	rootCmd.PersistentFlags().Bool("log-command", false, "When true, log commands to the log file")
