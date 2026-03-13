@@ -37,14 +37,18 @@ import (
 )
 
 // newMCPServer creates a new MCP server with all tools, resources, and prompts registered.
-func newMCPServer() *server.MCPServer {
+// When stdio is true, session management tools (set_skywalking_url) are also registered,
+// since stdio has a single client and session semantics are well-defined.
+func newMCPServer(stdio bool) *server.MCPServer {
 	s := server.NewMCPServer(
 		"skywalking-mcp", "0.1.0",
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithLogging(),
 	)
-	AddSessionTools(s)
+	if stdio {
+		AddSessionTools(s)
+	}
 	tools.AddTraceTools(s)
 	tools.AddLogTools(s)
 	tools.AddMQETools(s)
@@ -168,29 +172,23 @@ func EnhanceStdioContextFunc() server.StdioContextFunc {
 }
 
 // EnhanceSSEContextFunc returns a SSEContextFunc that enriches the context
-// with SkyWalking settings from SSE request headers and a per-session store.
+// with SkyWalking settings from SSE request headers and CLI-configured auth.
 func EnhanceSSEContextFunc() server.SSEContextFunc {
-	session := &Session{}
 	return func(ctx context.Context, req *http.Request) context.Context {
-		ctx = WithSession(ctx, session)
 		urlStr := urlFromHeaders(req)
 		ctx = WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
 		ctx = withConfiguredAuth(ctx)
-		ctx = applySessionOverrides(ctx)
 		return ctx
 	}
 }
 
 // EnhanceHTTPContextFunc returns a HTTPContextFunc that enriches the context
-// with SkyWalking settings from HTTP request headers and a per-session store.
+// with SkyWalking settings from HTTP request headers and CLI-configured auth.
 func EnhanceHTTPContextFunc() server.HTTPContextFunc {
-	session := &Session{}
 	return func(ctx context.Context, req *http.Request) context.Context {
-		ctx = WithSession(ctx, session)
 		urlStr := urlFromHeaders(req)
 		ctx = WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
 		ctx = withConfiguredAuth(ctx)
-		ctx = applySessionOverrides(ctx)
 		return ctx
 	}
 }
