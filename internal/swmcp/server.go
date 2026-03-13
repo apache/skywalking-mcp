@@ -35,33 +35,24 @@ import (
 	"github.com/apache/skywalking-mcp/internal/tools"
 )
 
-// newMcpServer creates a new MCP server instance,
-// and we can add various tools and capabilities to it.
-func newMcpServer() *server.MCPServer {
-	mcpServer := server.NewMCPServer(
-		"skywalking-mcp",
-		"0.1.0",
+// newMCPServer creates a new MCP server with all tools, resources, and prompts registered.
+func newMCPServer() *server.MCPServer {
+	s := server.NewMCPServer(
+		"skywalking-mcp", "0.1.0",
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithLogging(),
 	)
-
-	// add tools and capabilities to the MCP server
-	tools.AddTraceTools(mcpServer)
-	tools.AddLogTools(mcpServer)
-	tools.AddMQETools(mcpServer)
-	tools.AddMetadataTools(mcpServer)
-	tools.AddEventTools(mcpServer)
-	tools.AddAlarmTools(mcpServer)
-	tools.AddTopologyTools(mcpServer)
-
-	// add MQE documentation resources
-	resources.AddMQEResources(mcpServer)
-
-	// add prompts for guided interactions
-	prompts.AddSkyWalkingPrompts(mcpServer)
-
-	return mcpServer
+	tools.AddTraceTools(s)
+	tools.AddLogTools(s)
+	tools.AddMQETools(s)
+	tools.AddMetadataTools(s)
+	tools.AddEventTools(s)
+	tools.AddAlarmTools(s)
+	tools.AddTopologyTools(s)
+	resources.AddMQEResources(s)
+	prompts.AddSkyWalkingPrompts(s)
+	return s
 }
 
 func initLogger(logFilePath string) (*logrus.Logger, error) {
@@ -101,11 +92,6 @@ func configuredSkyWalkingURL() string {
 	return tools.FinalizeURL(urlStr)
 }
 
-// urlAndInsecureFromConfig extracts URL and insecure flag from global configuration.
-func urlAndInsecureFromConfig() (string, bool) {
-	return configuredSkyWalkingURL(), false
-}
-
 // urlFromHeaders extracts URL for a request.
 // URL is sourced from Header > configured value > Default.
 func urlFromHeaders(req *http.Request) string {
@@ -120,8 +106,7 @@ func urlFromHeaders(req *http.Request) string {
 // WithSkyWalkingContextFromConfig injects the SkyWalking URL and insecure
 // settings from global configuration into the context.
 var WithSkyWalkingContextFromConfig server.StdioContextFunc = func(ctx context.Context) context.Context {
-	urlStr, _ := urlAndInsecureFromConfig()
-	return WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
+	return WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
 }
 
 // withSkyWalkingContextFromRequest is the shared logic for enriching context from an http.Request.

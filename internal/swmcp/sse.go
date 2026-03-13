@@ -72,7 +72,7 @@ func runSSEServer(ctx context.Context, cfg *config.SSEServerConfig) error {
 	}
 
 	sseServer := server.NewSSEServer(
-		newMcpServer(),
+		newMCPServer(),
 		server.WithStaticBasePath(cfg.BasePath),
 		server.WithSSEContextFunc(EnhanceSSEContextFunc()),
 	)
