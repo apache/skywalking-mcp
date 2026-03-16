@@ -24,11 +24,15 @@ MKDIR_P = mkdir -p
 GO_LINT = golangci-lint
 LICENSE_EYE = license-eye
 
-HUB ?= docker.io/apache
+HUB ?= ghcr.io/apache
 APP_NAME = skywalking-mcp
 
 .PHONY: all
 all: build ;
+
+.PHONY: help
+help: ## Show this help message.
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-25s %s\n", $$1, $$2}'
 
 .PHONY: build
 build: ## Build the binary.
@@ -43,12 +47,11 @@ $(GO_LINT):
 	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0
 $(LICENSE_EYE):
 	@$(LICENSE_EYE) --version > /dev/null 2>&1 || go install github.com/apache/skywalking-eyes/cmd/license-eye@latest
-	
-.PHONY: lint
-lint: $(GO_LINT)
+
+lint: $(GO_LINT) ## Run linter.
 	$(GO_LINT) run -v --timeout 5m ./...
-.PHONY: fix-lint
-fix-lint: $(GO_LINT)
+
+fix-lint: $(GO_LINT) ## Auto-fix lint issues.
 	$(GO_LINT) run -v --fix ./...
 
 .PHONY: license-header
@@ -61,7 +64,7 @@ fix-license-header: $(LICENSE_EYE)
 
 .PHONY: dependency-license
 dependency-license: $(LICENSE_EYE)
-	@rm	 -rf ./dist/licenses
+	@rm -rf ./dist/licenses
 	@$(LICENSE_EYE) dependency resolve --summary ./dist/LICENSE.tpl --output ./dist/licenses || exit 1
 	@if [ ! -z "`git diff -U0 ./dist`" ]; then \
 		echo "LICENSE file is not updated correctly"; \
@@ -86,11 +89,9 @@ clean:
 	-rm -rf *.tgz
 	-rm -rf *.asc
 	-rm -rf *.sha512
-	@go mod tidy &> /dev/null
 
 .PHONY: build-image
-build-image: ## Build the Docker image.
-	docker build -t $(APP_NAME):latest .
+build-image: docker-build ## Build the Docker image.
 
 .PHONY: docker-build
 docker-build: ## Build the Docker image (local only).
@@ -125,6 +126,7 @@ PUSH_RELEASE_SCRIPTS := ./scripts/push-release.sh
 release-push-candidate:
 	${PUSH_RELEASE_SCRIPTS}
 
+.PHONY: lint fix-lint
 .PHONY: license-header fix-license-header dependency-license fix-dependency-license
 .PHONY: release-binary release-source release-sign release-assembly
 .PHONY: release-push-candidate
