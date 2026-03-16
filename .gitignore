@@ -42,3 +42,4 @@ inspector-config.json
 *.log
 .vscode/
 .claude/
+build/
