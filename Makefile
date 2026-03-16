@@ -24,47 +24,47 @@ MKDIR_P = mkdir -p
 GO_LINT = golangci-lint
 LICENSE_EYE = license-eye
 
-HUB ?= docker.io/apache
+HUB ?= ghcr.io/apache
 APP_NAME = skywalking-mcp
 
 .PHONY: all
 all: build ;
 
+.PHONY: help
+help: ## Show this help message.
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-25s %s\n", $$1, $$2}'
+
 .PHONY: build
 build: ## Build the binary.
 	${MKDIR_P} bin/
 	CGO_ENABLED=0 go build -ldflags "\
-	    -X ${VERSION_PATH}.version=${VERSION} \
+	  -X ${VERSION_PATH}.version=${VERSION} \
 		-X ${VERSION_PATH}.commit=${GIT_COMMIT} \
 		-X ${VERSION_PATH}.date=${BUILD_DATE}" \
 		-o bin/swmcp cmd/skywalking-mcp/main.go
-
-.PHONY: build-image
-build-image: ## Build the Docker image.
-	docker build -t skywalking-mcp:latest .
 
 $(GO_LINT):
 	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0
 $(LICENSE_EYE):
 	@$(LICENSE_EYE) --version > /dev/null 2>&1 || go install github.com/apache/skywalking-eyes/cmd/license-eye@latest
-	
-.PHONY: lint
-lint: $(GO_LINT)
+
+lint: $(GO_LINT) ## Run linter.
 	$(GO_LINT) run -v --timeout 5m ./...
-.PHONY: fix-lint
-fix-lint: $(GO_LINT)
+
+fix-lint: $(GO_LINT) ## Auto-fix lint issues.
 	$(GO_LINT) run -v --fix ./...
 
 .PHONY: license-header
-license-header: clean $(LICENSE_EYE)
+license-header: $(LICENSE_EYE)
 	@$(LICENSE_EYE) header check
 
 .PHONY: fix-license-header
-fix-license-header: clean $(LICENSE_EYE)
+fix-license-header: $(LICENSE_EYE)
 	@$(LICENSE_EYE) header fix
 
 .PHONY: dependency-license
-dependency-license: clean $(LICENSE_EYE)
+dependency-license: $(LICENSE_EYE)
+	@rm -rf ./dist/licenses
 	@$(LICENSE_EYE) dependency resolve --summary ./dist/LICENSE.tpl --output ./dist/licenses || exit 1
 	@if [ ! -z "`git diff -U0 ./dist`" ]; then \
 		echo "LICENSE file is not updated correctly"; \
@@ -73,7 +73,7 @@ dependency-license: clean $(LICENSE_EYE)
 	fi
 
 .PHONY: fix-dependency-license
-fix-dependency-license: clean $(LICENSE_EYE)
+fix-dependency-license: $(LICENSE_EYE)
 	@$(LICENSE_EYE) dependency resolve --summary ./dist/LICENSE.tpl --output ./dist/licenses
 
 .PHONY: fix-license
@@ -87,20 +87,46 @@ clean:
 	-rm -rf bin
 	-rm -rf coverage.txt
 	-rm -rf *.tgz
-	-rm -rf *.tgz
 	-rm -rf *.asc
 	-rm -rf *.sha512
-	@go mod tidy &> /dev/null
+
+.PHONY: build-image
+build-image: docker-build ## Build the Docker image.
+
+.PHONY: docker-build
+docker-build: ## Build the Docker image (local only).
+	docker build --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
+
+.PHONY: docker-push
+docker-push: ## Push existing Docker images to the registry.
+	docker push $(HUB)/$(APP_NAME):$(VERSION)
+	docker push $(HUB)/$(APP_NAME):latest
 
 .PHONY: docker
-docker: PUSH_OR_LOAD = --load
-docker: PLATFORMS =
+docker: docker-build
 
 .PHONY: docker.push
-docker.push: PUSH_OR_LOAD = --push
-docker.push: PLATFORMS = --platform linux/386,linux/amd64,linux/arm64
+docker.push: docker-push
 
-docker docker.push:
-	docker buildx create --use --driver docker-container --name skywalking_mcp > /dev/null 2>&1 || true
-	docker buildx build $(PUSH_OR_LOAD) $(PLATFORMS) --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
-	docker buildx rm skywalking_mcp
+## Release
+RELEASE_SCRIPTS := ./scripts/release.sh
+
+release-binary: release-source ## Package binary archive
+	${RELEASE_SCRIPTS} -b
+
+release-source: ## Package source archive
+	${RELEASE_SCRIPTS} -s
+
+release-sign: ## Sign artifacts
+	${RELEASE_SCRIPTS} -k mcp
+
+release-assembly: release-binary release-sign ## Generate release package
+
+PUSH_RELEASE_SCRIPTS := ./scripts/push-release.sh
+release-push-candidate:
+	${PUSH_RELEASE_SCRIPTS}
+
+.PHONY: lint fix-lint
+.PHONY: license-header fix-license-header dependency-license fix-dependency-license
+.PHONY: release-binary release-source release-sign release-assembly
+.PHONY: release-push-candidate

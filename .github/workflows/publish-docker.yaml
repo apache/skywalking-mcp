@@ -20,10 +20,13 @@ on:
   push:
     branches:
       - main
+  release:
+    types:
+      - released
 
 env:
   SKIP_TEST: true
-  HUB: ghcr.io/apache/skywalking-mcp
+  APP_NAME: skywalking-mcp
 
 jobs:
   build:
@@ -34,21 +37,37 @@ jobs:
       packages: write
     timeout-minutes: 30
     env:
-      VERSION: ${{ github.sha }}
-      APP_NAME: skywalking-mcp
+      VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || github.sha }}
+      PLATFORMS: linux/amd64,linux/arm64
+      HUB: ${{ github.event_name == 'release' && 'docker.io/apache' || 'ghcr.io/apache' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          submodules: true
+          fetch-tags: true
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.25
-      - name: Log in to the Container registry
+      - name: Build binary
+        run: make build
+      - name: Build docker image
+        run: |
+          make docker-build
+          docker image ls
+      - name: Log in to GHCR
         uses: docker/login-action@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
-          registry: ${{ env.HUB }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push docker images
-        run: make docker.push || make docker.push
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        if: github.event_name == 'release'
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Push docker images
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
+        run: make docker-push
