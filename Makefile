@@ -34,7 +34,7 @@ all: build ;
 build: ## Build the binary.
 	${MKDIR_P} bin/
 	CGO_ENABLED=0 go build -ldflags "\
-	    -X ${VERSION_PATH}.version=${VERSION} \
+	  -X ${VERSION_PATH}.version=${VERSION} \
 		-X ${VERSION_PATH}.commit=${GIT_COMMIT} \
 		-X ${VERSION_PATH}.date=${BUILD_DATE}" \
 		-o bin/swmcp cmd/skywalking-mcp/main.go
@@ -84,7 +84,6 @@ clean:
 	-rm -rf bin
 	-rm -rf coverage.txt
 	-rm -rf *.tgz
-	-rm -rf *.tgz
 	-rm -rf *.asc
 	-rm -rf *.sha512
 	@go mod tidy &> /dev/null
@@ -93,18 +92,20 @@ clean:
 build-image: ## Build the Docker image.
 	docker build -t $(APP_NAME):latest .
 
+.PHONY: docker-build
+docker-build: ## Build the Docker image (local only).
+	docker build --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
+
+.PHONY: docker-push
+docker-push: ## Push existing Docker images to the registry.
+	docker push $(HUB)/$(APP_NAME):$(VERSION)
+	docker push $(HUB)/$(APP_NAME):latest
+
 .PHONY: docker
-docker: PUSH_OR_LOAD = --load
-docker: PLATFORMS =
+docker: docker-build
 
 .PHONY: docker.push
-docker.push: PUSH_OR_LOAD = --push
-docker.push: PLATFORMS = --platform linux/amd64,linux/arm64
-
-docker docker.push:
-	docker buildx create --use --driver docker-container --name skywalking_mcp > /dev/null 2>&1 || true
-	docker buildx build $(PUSH_OR_LOAD) $(PLATFORMS) --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
-	docker buildx rm skywalking_mcp
+docker.push: docker-push
 
 ## Release
 RELEASE_SCRIPTS := ./scripts/release.sh
@@ -116,11 +117,14 @@ release-source: ## Package source archive
 	${RELEASE_SCRIPTS} -s
 
 release-sign: ## Sign artifacts
-	${RELEASE_SCRIPTS} -k
+	${RELEASE_SCRIPTS} -k mcp
 
 release-assembly: release-binary release-sign ## Generate release package
 
+PUSH_RELEASE_SCRIPTS := ./scripts/push-release.sh
+release-push-candidate:
+	${PUSH_RELEASE_SCRIPTS}
 
-.PHONY: tag-release
-tag-release: ## Create/push tag, assemble signed release artifacts, and upload RC to Apache SVN dist (requires VERSION and release credentials)
-	VERSION=$(VERSION) ./scripts/push-release.sh
+.PHONY: license-header fix-license-header dependency-license fix-dependency-license
+.PHONY: release-binary release-source release-sign release-assembly
+.PHONY: release-push-candidate
