@@ -22,7 +22,7 @@ on:
       - main
   release:
     types:
-      - published
+      - released
 
 env:
   SKIP_TEST: true
