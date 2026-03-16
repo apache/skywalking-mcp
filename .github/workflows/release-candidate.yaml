@@ -1,0 +1,103 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: release-candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the leading v (for example, 0.1.0)
+        required: true
+        type: string
+      ref:
+        description: Git ref to release from
+        required: false
+        default: main
+        type: string
+
+jobs:
+  release:
+    name: Tag and publish release candidate
+    if: github.repository == 'apache/skywalking-mcp'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+      SVN_USERNAME: ${{ secrets.APACHE_SVN_USERNAME }}
+      SVN_PASSWORD: ${{ secrets.APACHE_SVN_PASSWORD }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Import GPG key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+        run: |
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          printf 'allow-loopback-pinentry\npinentry-mode loopback\n' > ~/.gnupg/gpg.conf
+          printf 'use-agent\nallow-loopback-pinentry\n' > ~/.gnupg/gpg-agent.conf
+          echo RELOADAGENT | gpg-connect-agent
+
+      - name: Configure Subversion credentials
+        run: |
+          mkdir -p ~/.subversion
+          cat <<EOF > ~/.subversion/servers
+[global]
+store-passwords = yes
+store-plaintext-passwords = no
+http-auth-types = basic
+EOF
+
+      - name: Configure SVN auth cache
+        run: |
+          svn --non-interactive --username "$SVN_USERNAME" --password "$SVN_PASSWORD" ls https://dist.apache.org/repos/dist/dev/skywalking/ >/dev/null
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run release candidate flow
+        env:
+          GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+        run: make tag-release VERSION=${VERSION}
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: skywalking-mcp-${{ inputs.version }}-release-candidate
+          path: |
+            build/skywalking-mcp-${{ inputs.version }}.tgz
+            build/skywalking-mcp-${{ inputs.version }}.tgz.asc
+            build/skywalking-mcp-${{ inputs.version }}.tgz.sha512
+            build/skywalking-mcp-${{ inputs.version }}-src.tgz
+            build/skywalking-mcp-${{ inputs.version }}-src.tgz.asc
+            build/skywalking-mcp-${{ inputs.version }}-src.tgz.sha512

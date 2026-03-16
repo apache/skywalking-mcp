@@ -69,6 +69,25 @@ RELEASE_VERSION=$(resolve_release_version)
 
 SOURCE_FILE_NAME=skywalking-mcp-${RELEASE_VERSION}-src.tgz
 SOURCE_FILE=${BUILDDIR}/${SOURCE_FILE_NAME}
+BINARY_FILE_NAME=skywalking-mcp-${RELEASE_VERSION}.tgz
+BINARY_FILE=${BUILDDIR}/${BINARY_FILE_NAME}
+
+sign_artifact() {
+    local artifact_name=$1
+    local -a gpg_args=(--batch --yes --armor --detach-sig)
+
+    if [ ! -f "${artifact_name}" ]; then
+        echo "Error: artifact '${artifact_name}' does not exist in ${BUILDDIR}. Build it before signing." >&2
+        exit 1
+    fi
+
+    if [ -n "${GPG_PASSPHRASE:-}" ]; then
+        gpg_args+=(--pinentry-mode loopback --passphrase "${GPG_PASSPHRASE}")
+    fi
+
+    gpg "${gpg_args[@]}" "${artifact_name}"
+    shasum -a 512 "${artifact_name}" > "${artifact_name}.sha512"
+}
 
 binary(){
     require_cmd tar
@@ -93,7 +112,7 @@ binary(){
         cp -Rfv ./CHANGES.md "${bindir}"
         cp -Rfv ./README.md "${bindir}"
         cp -Rfv ./dist/* "${bindir}"
-        tar -czf "${BUILDDIR}/skywalking-mcp-${RELEASE_VERSION}.tgz" -C "${bindir}" .
+        tar -czf "${BINARY_FILE}" -C "${bindir}" .
     )
 }
 
@@ -109,9 +128,11 @@ source(){
         echo "RELEASE_VERSION=${RELEASE_VERSION}" > .env
         tar \
         --exclude=".DS_Store" \
+        --exclude=".git" \
         --exclude=".github" \
         --exclude=".gitignore" \
         --exclude=".asf.yaml" \
+        --exclude=".claude" \
         --exclude=".idea" \
         --exclude=".vscode" \
         --exclude="bin" \
@@ -130,8 +151,8 @@ sign(){
     pushd "${BUILDDIR}" >/dev/null
     trap 'popd >/dev/null' EXIT
 
-    gpg --batch --yes --armor --detach-sig "skywalking-mcp-${RELEASE_VERSION}.tgz"
-    shasum -a 512 "skywalking-mcp-${RELEASE_VERSION}.tgz" > "skywalking-mcp-${RELEASE_VERSION}.tgz.sha512"
+    sign_artifact "${BINARY_FILE_NAME}"
+    sign_artifact "${SOURCE_FILE_NAME}"
 }
 
 parseCmdLine(){
@@ -160,7 +181,7 @@ Usage:
 Parameters:
     -b  Build and assemble the binary package
     -s  Assemble the source package
-    -k  Sign the specified artifact type (currently 'mcp')
+    -k  Sign and checksum both the source and binary release artifacts
     -v  Print the resolved RELEASE_VERSION and exit
     -h  Show this help.
 EOF

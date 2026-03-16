@@ -25,6 +25,33 @@ fi
 VERSION=${VERSION}
 TAG_NAME=v${VERSION}
 PRODUCT_NAME="skywalking-mcp-${VERSION}"
+SVN_DIST_URL=${SVN_DIST_URL:-https://dist.apache.org/repos/dist/dev/skywalking/}
+
+svn_auth_args=()
+if [ -n "${SVN_USERNAME:-}" ]; then
+  svn_auth_args+=(--username "$SVN_USERNAME")
+fi
+if [ -n "${SVN_PASSWORD:-}" ]; then
+  svn_auth_args+=(--password "$SVN_PASSWORD")
+fi
+if [ ${#svn_auth_args[@]} -gt 0 ]; then
+  svn_auth_args+=(--non-interactive)
+fi
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Error: required command '$1' not found in PATH" >&2
+    exit 1
+  fi
+}
+
+ensure_clean_worktree() {
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "Error: Git working tree is not clean. Commit or stash changes before creating a release tag." >&2
+    git status --short >&2
+    exit 1
+  fi
+}
 
 echo "Release version "${VERSION}
 echo "Source tag "${TAG_NAME}
@@ -33,18 +60,44 @@ SCRIPTDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 ROOTDIR=${SCRIPTDIR}/..
 BUILDDIR=${ROOTDIR}/build
 
-pushd ${BUILDDIR}
+require_cmd git
+require_cmd make
+require_cmd svn
+require_cmd gpg
+require_cmd tar
+require_cmd shasum
+
+ensure_clean_worktree
+
+# --- Tagging ---
+# Create the local tag if it doesn't already exist.
+if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+  echo "Git tag ${TAG_NAME} already exists, skipping tag creation."
+else
+  git tag -a "$TAG_NAME" -m "Release ${TAG_NAME}"
+  echo "Created git tag ${TAG_NAME}"
+fi
+
+# --- Build & sign release artifacts ---
+# Run from the repo root so make targets resolve correctly.
+(cd "${ROOTDIR}" && RELEASE_VERSION="${VERSION}" make release-assembly)
+
+# Push the tag only after a successful build so a failed build doesn't
+# leave a dangling tag on the remote.
+git push origin "$TAG_NAME"
+
+pushd "${BUILDDIR}"
 trap 'popd' EXIT
 
-rm -rf skywalking
+rm -rf "${BUILDDIR}/skywalking"
 
-svn co https://dist.apache.org/repos/dist/dev/skywalking/
+svn "${svn_auth_args[@]}" co "${SVN_DIST_URL}"
 mkdir -p skywalking/mcp/"$VERSION"
 cp ${PRODUCT_NAME}-*.tgz skywalking/mcp/"$VERSION"
 cp ${PRODUCT_NAME}-*.tgz.asc skywalking/mcp/"$VERSION"
 cp ${PRODUCT_NAME}-*.tgz.sha512 skywalking/mcp/"$VERSION"
 
-cd skywalking/mcp && svn add "$VERSION" && svn commit -m "Draft Apache SkyWalking MCP release $VERSION"
+cd skywalking/mcp && svn "${svn_auth_args[@]}" add "$VERSION" && svn "${svn_auth_args[@]}" commit -m "Draft Apache SkyWalking MCP release $VERSION"
 cd "$VERSION"
 
 cat << EOF
@@ -64,7 +117,7 @@ Release Candidate:
 
  * https://dist.apache.org/repos/dist/dev/skywalking/mcp/$VERSION
  * sha512 checksums
-   - $(cat ${PRODUCT_NAME}-mcp.tgz.sha512)
+   - $(cat ${PRODUCT_NAME}.tgz.sha512)
 
 Release Tag :
 

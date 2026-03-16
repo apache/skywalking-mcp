@@ -104,6 +104,15 @@ If using Docker:
 }
 ```
 
+## Release workflow
+
+Release instructions are available in [`RELEASE.md`](./RELEASE.md), including:
+
+- local `make tag-release` usage
+- GitHub Actions `release-candidate` workflow usage
+- required GPG and SVN secrets
+- generated release artifacts and release notes
+
 ## Available Tools
 
 SkyWalking MCP provides the following tools to query and analyze SkyWalking OAP data:
