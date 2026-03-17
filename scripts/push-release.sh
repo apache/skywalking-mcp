@@ -50,7 +50,7 @@ mkdir -p skywalking/mcp/"$VERSION"
 cp ${PRODUCT_NAME}*.tgz skywalking/mcp/"$VERSION"
 cp ${PRODUCT_NAME}*.tgz.asc skywalking/mcp/"$VERSION"
 cp ${PRODUCT_NAME}*.tgz.sha512 skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}-src*.tgz skywalking/mcp/"$VERSION" 
+cp ${PRODUCT_NAME}-src*.tgz skywalking/mcp/"$VERSION"
 cp ${PRODUCT_NAME}-src*.tgz.asc skywalking/mcp/"$VERSION"
 cp ${PRODUCT_NAME}-src*.tgz.sha512 skywalking/mcp/"$VERSION"
 
