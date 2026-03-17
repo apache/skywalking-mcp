@@ -33,8 +33,6 @@ Add a section for the new version to `CHANGES.md` and commit to `main`.
 
 ## Step 2 — Create and push a Git tag
 
-The tag must exist **before** building artifacts — `release.sh` derives the version from it.
-
 ```bash
 export VERSION=0.1.0-rc0   # no "v" prefix; used throughout all steps below
 git tag v${VERSION}
@@ -45,9 +43,19 @@ git push origin v${VERSION}
 
 ## Step 3 — Build and sign the artifacts
 
+`release.sh` resolves the version from the **latest tag reachable in the repo** (via `git describe --tags`), not from the `VERSION` env var. To ensure the artifacts are stamped with the intended version, use one of these approaches:
+
+**Option A (recommended): set `RELEASE_VERSION` explicitly**
+
 ```bash
-make release-assembly
+RELEASE_VERSION=${VERSION} make release-assembly
 ```
+
+**Option B: ensure the new tag is the latest in the repo**
+
+If `v${VERSION}` is already the most recent tag, `make release-assembly` picks it up automatically without any env override.
+
+> If another newer tag exists in the repo, Option A is required to avoid building artifacts with the wrong version.
 
 This runs three steps in sequence:
 1. `release-source` — creates `build/skywalking-mcp-${VERSION}-src.tgz`
