@@ -130,6 +130,8 @@ sign(){
     pushd "${BUILDDIR}" >/dev/null
     trap 'popd >/dev/null' EXIT
 
+    gpg --batch --yes --armor --detach-sig "skywalking-mcp-${RELEASE_VERSION}-src.tgz"
+    shasum -a 512 "skywalking-mcp-${RELEASE_VERSION}-src.tgz" > "skywalking-mcp-${RELEASE_VERSION}-src.tgz.sha512"
     gpg --batch --yes --armor --detach-sig "skywalking-mcp-${RELEASE_VERSION}.tgz"
     shasum -a 512 "skywalking-mcp-${RELEASE_VERSION}.tgz" > "skywalking-mcp-${RELEASE_VERSION}.tgz.sha512"
 }

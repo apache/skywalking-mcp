@@ -33,6 +33,13 @@ SCRIPTDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 ROOTDIR=${SCRIPTDIR}/..
 BUILDDIR=${ROOTDIR}/build
 
+if ! git -C "${ROOTDIR}" show-ref --tags --verify "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
+  echo "Error: Git tag '${TAG_NAME}' not found. Create and push the tag first:" >&2
+  echo "  git tag ${TAG_NAME} && git push origin ${TAG_NAME}" >&2
+  exit 1
+fi
+RELEASE_COMMIT=$(git -C "${ROOTDIR}" rev-list -n 1 "${TAG_NAME}")
+
 pushd ${BUILDDIR}
 trap 'popd' EXIT
 
@@ -40,12 +47,17 @@ rm -rf skywalking
 
 svn co https://dist.apache.org/repos/dist/dev/skywalking/
 mkdir -p skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}-*.tgz skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}-*.tgz.asc skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}-*.tgz.sha512 skywalking/mcp/"$VERSION"
+BINARY_TGZ="${PRODUCT_NAME}.tgz"
+SRC_TGZ="${PRODUCT_NAME}-src.tgz"
+cp "${BINARY_TGZ}" skywalking/mcp/"$VERSION"
+cp "${BINARY_TGZ}.asc" skywalking/mcp/"$VERSION"
+cp "${BINARY_TGZ}.sha512" skywalking/mcp/"$VERSION"
+cp "${SRC_TGZ}" skywalking/mcp/"$VERSION"
+cp "${SRC_TGZ}.asc" skywalking/mcp/"$VERSION"
+cp "${SRC_TGZ}.sha512" skywalking/mcp/"$VERSION"
 
-cd skywalking/mcp && svn add "$VERSION" && svn commit -m "Draft Apache SkyWalking MCP release $VERSION"
-cd "$VERSION"
+cd skywalking && svn add --parents mcp/"$VERSION" && svn commit -m "Draft Apache SkyWalking MCP release $VERSION"
+cd mcp/"$VERSION"
 
 cat << EOF
 =========================================================================
@@ -72,7 +84,7 @@ Release Tag :
 
 Release Commit Hash :
 
- * https://github.com/apache/skywalking-mcp/tree/$(git rev-list -n 1 "$TAG_NAME")
+ * https://github.com/apache/skywalking-mcp/tree/${RELEASE_COMMIT}
 
 Keys to verify the Release Candidate :
 
