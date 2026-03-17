@@ -52,14 +52,16 @@ make release-assembly
 This runs three steps in sequence:
 1. `release-source` — creates `build/skywalking-mcp-${VERSION}-src.tgz`
 2. `release-binary` — creates `build/skywalking-mcp-${VERSION}.tgz`
-3. `release-sign` — creates `build/skywalking-mcp-${VERSION}.tgz.asc` and `.tgz.sha512`
+3. `release-sign` — creates signatures and checksums for both tarballs:
+    - `build/skywalking-mcp-${VERSION}.tgz.asc` and `build/skywalking-mcp-${VERSION}.tgz.sha512`
+    - `build/skywalking-mcp-${VERSION}-src.tgz.asc` and `build/skywalking-mcp-${VERSION}-src.tgz.sha512`
 
 ---
 
 ## Step 4 — Upload to Apache dist/dev and send vote email
 
 ```bash
-VERSION=${VERSION} make release-push-candidate
+make release-push-candidate
 ```
 
 This script:

@@ -33,7 +33,7 @@ SCRIPTDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 ROOTDIR=${SCRIPTDIR}/..
 BUILDDIR=${ROOTDIR}/build
 
-if ! git -C "${ROOTDIR}" rev-parse "${TAG_NAME}" >/dev/null 2>&1; then
+if ! git -C "${ROOTDIR}" show-ref --tags --verify "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
   echo "Error: Git tag '${TAG_NAME}' not found. Create and push the tag first:" >&2
   echo "  git tag ${TAG_NAME} && git push origin ${TAG_NAME}" >&2
   exit 1
