@@ -47,12 +47,14 @@ rm -rf skywalking
 
 svn co https://dist.apache.org/repos/dist/dev/skywalking/
 mkdir -p skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}*.tgz skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}*.tgz.asc skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}*.tgz.sha512 skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}-src*.tgz skywalking/mcp/"$VERSION" 
-cp ${PRODUCT_NAME}-src*.tgz.asc skywalking/mcp/"$VERSION"
-cp ${PRODUCT_NAME}-src*.tgz.sha512 skywalking/mcp/"$VERSION"
+BINARY_TGZ="${PRODUCT_NAME}.tgz"
+SRC_TGZ="${PRODUCT_NAME}-src.tgz"
+cp "${BINARY_TGZ}" skywalking/mcp/"$VERSION"
+cp "${BINARY_TGZ}.asc" skywalking/mcp/"$VERSION"
+cp "${BINARY_TGZ}.sha512" skywalking/mcp/"$VERSION"
+cp "${SRC_TGZ}" skywalking/mcp/"$VERSION"
+cp "${SRC_TGZ}.asc" skywalking/mcp/"$VERSION"
+cp "${SRC_TGZ}.sha512" skywalking/mcp/"$VERSION"
 
 cd skywalking && svn add --parents mcp/"$VERSION" && svn commit -m "Draft Apache SkyWalking MCP release $VERSION"
 cd mcp/"$VERSION"
