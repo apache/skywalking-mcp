@@ -94,13 +94,15 @@ clean:
 build-image: docker-build ## Build the Docker image.
 
 .PHONY: docker-build
-docker-build: ## Build the Docker image (local only).
-	docker build --build-arg VERSION=$(VERSION) . -t $(HUB)/$(APP_NAME):$(VERSION) -t $(HUB)/$(APP_NAME):latest
+docker-build: ## Build the Docker image for linux/amd64 and linux/arm64 and push to the registry.
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		--build-arg VERSION=$(VERSION) \
+		-t $(HUB)/$(APP_NAME):$(VERSION) \
+		-t $(HUB)/$(APP_NAME):latest \
+		--push .
 
 .PHONY: docker-push
-docker-push: ## Push existing Docker images to the registry.
-	docker push $(HUB)/$(APP_NAME):$(VERSION)
-	docker push $(HUB)/$(APP_NAME):latest
+docker-push: docker-build ## Build and push multi-platform Docker images to the registry.
 
 .PHONY: docker
 docker: docker-build
