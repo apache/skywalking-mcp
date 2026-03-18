@@ -84,7 +84,25 @@ bin/swmcp sse --sse-address localhost:8000 --base-path /mcp --sw-url http://loca
 
 If using Docker:
 
-`make build-image` to build the Docker image, then configure the MCP server like this:
+`make build-image` builds a local `linux/amd64` image by default. For multi-platform publishing, use `make docker-push`, which builds and pushes `linux/amd64,linux/arm64` images via Docker Buildx.
+
+Common variants:
+
+```bash
+# Build a local image and load it into your Docker daemon
+make build-image
+
+# Build and push a multi-platform image to the default registry
+make docker-push VERSION=0.1.0
+
+# Push to a custom registry/repository
+make docker-push IMAGE=ghcr.io/your-org/skywalking-mcp VERSION=0.1.0
+
+# Build for a custom platform set
+make docker-build PLATFORMS=linux/arm64 OUTPUT=--load
+```
+
+Then configure the MCP server like this:
 
 ```json
 {

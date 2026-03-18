@@ -26,6 +26,11 @@ LICENSE_EYE = license-eye
 
 HUB ?= ghcr.io/apache
 APP_NAME = skywalking-mcp
+IMAGE ?= $(HUB)/$(APP_NAME)
+PLATFORMS ?= linux/amd64
+MULTI_PLATFORMS ?= linux/amd64,linux/arm64
+OUTPUT ?= --load
+IMAGE_TAGS ?= -t $(IMAGE):$(VERSION) -t $(IMAGE):latest
 
 .PHONY: all
 all: build ;
@@ -94,15 +99,21 @@ clean:
 build-image: docker-build ## Build the Docker image.
 
 .PHONY: docker-build
-docker-build: ## Build the Docker image for linux/amd64 and linux/arm64 and push to the registry.
-	docker buildx build --platform linux/amd64,linux/arm64 \
+docker-build: ## Build the Docker image with Buildx. Defaults to a local linux/amd64 image; override PLATFORMS/OUTPUT as needed.
+	docker buildx build --platform $(PLATFORMS) \
 		--build-arg VERSION=$(VERSION) \
-		-t $(HUB)/$(APP_NAME):$(VERSION) \
-		-t $(HUB)/$(APP_NAME):latest \
-		--push .
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		$(IMAGE_TAGS) \
+		$(OUTPUT) .
 
 .PHONY: docker-push
-docker-push: docker-build ## Build and push multi-platform Docker images to the registry.
+docker-push: ## Build and push multi-platform Docker images to the registry.
+	$(MAKE) docker-build PLATFORMS=$(MULTI_PLATFORMS) OUTPUT=--push
+
+.PHONY: docker-build-multi
+docker-build-multi: ## Build a local multi-platform image index without pushing (requires OUTPUT like --output=type=oci,dest=...).
+	$(MAKE) docker-build PLATFORMS=$(MULTI_PLATFORMS) OUTPUT='$(OUTPUT)'
 
 .PHONY: docker
 docker: docker-build
@@ -131,4 +142,4 @@ release-push-candidate:
 .PHONY: lint fix-lint
 .PHONY: license-header fix-license-header dependency-license fix-dependency-license
 .PHONY: release-binary release-source release-sign release-assembly
-.PHONY: release-push-candidate
+.PHONY: release-push-candidate docker-build-multi

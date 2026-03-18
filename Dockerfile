@@ -14,10 +14,14 @@
 # limitations under the License.
 
 # Build stage
-FROM golang:1.25-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS builder
 
 # Default version
 ARG VERSION="dev"
+ARG GIT_COMMIT="unknown"
+ARG BUILD_DATE="unknown"
+ARG TARGETOS
+ARG TARGETARCH
 
 # Set the working directory
 WORKDIR /app
@@ -25,15 +29,15 @@ WORKDIR /app
 # Copy go.mod and go.sum files
 COPY go.mod go.sum ./
 
-# Go get dependencies
-RUN go mod tidy
+# Resolve dependencies
+RUN go mod download
 
 # Copy the source code
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 go build \
-    -ldflags="-s -w -X main.version=${VERSION} -X main.commit=$(git rev-parse HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+    -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${GIT_COMMIT} -X main.date=${BUILD_DATE}" \
     -o bin/swmcp ./cmd/skywalking-mcp/main.go
 
 # Make a stage to run the app
