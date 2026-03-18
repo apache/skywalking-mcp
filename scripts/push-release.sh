@@ -77,6 +77,7 @@ Release Candidate:
  * https://dist.apache.org/repos/dist/dev/skywalking/mcp/$VERSION
  * sha512 checksums
    - $(cat ${PRODUCT_NAME}.tgz.sha512)
+   - $(cat ${PRODUCT_NAME}-src.tgz.sha512)
 
 Release Tag :
 

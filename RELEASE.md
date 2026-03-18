@@ -130,42 +130,25 @@ Send an announcement email to `announce@apache.org` and `dev@skywalking.apache.o
 ```
 Subject: [ANNOUNCE] Apache SkyWalking MCP {VERSION} Released
 
-Hi the SkyWalking Community:
+Hi All,
 
-This is a call for vote to release Apache SkyWalking MCP version $VERSION.
+The Apache SkyWalking Team is glad to announce the release of Apache SkyWalking MCP {VERSION}.
 
-Release notes:
+SkyWalking: APM (application performance monitor) tool for distributed systems, especially designed for microservices, cloud native and container-based (Docker, Kubernetes, Mesos) architectures.
 
- * https://github.com/apache/skywalking-mcp/blob/v$VERSION/CHANGES.md
+SkyWalking MCP: an MCP (Model Context Protocol) server that bridges AI agents with Apache SkyWalking OAP via GraphQL. It exposes SkyWalking's observability data (traces, logs, metrics, topology, alarms, events) as MCP tools, prompts, and resources.
 
-Release Candidate:
+Please refer to the change log for the complete list of changes: https://github.com/apache/skywalking-mcp/releases/tag/v{VERSION}
 
- * https://dist.apache.org/repos/dist/dev/skywalking/mcp/$VERSION
- * sha512 checksums
-   - $(cat ${PRODUCT_NAME}.tgz.sha512)
+Apache SkyWalking website: http://skywalking.apache.org/
 
-Release Tag :
+Downloads: http://skywalking.apache.org/downloads/
 
- * (Git Tag) $TAG_NAME
+Twitter: https://twitter.com/ASFSkyWalking
 
-Release Commit Hash :
+SkyWalking Resources:
+- GitHub: https://github.com/apache/skywalking
+- Issue: https://github.com/apache/skywalking/issues
+- Mailing list: dev@skywalking.apache.org <mailto:dev@skywalking.apache.org>
 
- * https://github.com/apache/skywalking-mcp/tree/${RELEASE_COMMIT}
-
-Keys to verify the Release Candidate :
-
- * https://dist.apache.org/repos/dist/release/skywalking/KEYS
-
-Guide to build the release from source :
-
- * https://github.com/apache/skywalking-mcp/blob/v$VERSION/README.md
-
-Voting will start now and will remain open for at least 72 hours, all PMC members are required to give their votes.
-
-[ ] +1 Release this package.
-[ ] +0 No opinion.
-[ ] -1 Do not release this package because....
-
-Thanks.
-
-[1] https://github.com/apache/skywalking/blob/master/docs/en/guides/How-to-release.md#vote-check
+- The Apache SkyWalking Team
