@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
-	"github.com/apache/skywalking-mcp/internal/config"
 	"github.com/spf13/viper"
+
+	"github.com/apache/skywalking-mcp/internal/config"
 )
+
+const sessionOAPURL = "http://session-oap:12800/graphql"
 
 func TestConfiguredSkyWalkingURLUsesDefaultWhenUnset(t *testing.T) {
 	t.Cleanup(viper.Reset)
@@ -100,13 +103,13 @@ func TestApplySessionOverridesWithURLOnlyKeepsConfiguredAuth(t *testing.T) {
 	ctx = WithSkyWalkingAuth(ctx, "configured-user", "configured-pass")
 
 	session := &Session{}
-	session.SetConnection("http://session-oap:12800/graphql", "", "")
+	session.SetConnection(sessionOAPURL, "", "")
 	ctx = WithSession(ctx, session)
 
 	got := applySessionOverrides(ctx)
 
 	gotURL, _ := got.Value(contextkey.BaseURL{}).(string)
-	if gotURL != "http://session-oap:12800/graphql" {
+	if gotURL != sessionOAPURL {
 		t.Fatalf("base URL = %q", gotURL)
 	}
 
@@ -126,13 +129,13 @@ func TestEnhanceStdioContextFuncStillAllowsSessionOverride(t *testing.T) {
 	viper.Set("url", "http://configured-oap:12800")
 
 	session := &Session{}
-	session.SetConnection("http://session-oap:12800/graphql", "user", "pass")
+	session.SetConnection(sessionOAPURL, "user", "pass")
 
 	ctx := WithSession(context.Background(), session)
 	ctx = applySessionOverrides(WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false))
 
 	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
-	if gotURL != "http://session-oap:12800/graphql" {
+	if gotURL != sessionOAPURL {
 		t.Fatalf("base URL = %q", gotURL)
 	}
 

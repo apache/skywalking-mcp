@@ -266,7 +266,7 @@ func readPrivateField(v reflect.Value) reflect.Value {
 }
 
 func copyReflectValue(v reflect.Value) reflect.Value {
-	copy := reflect.New(v.Type()).Elem()
-	copy.Set(v)
-	return copy
+	cloned := reflect.New(v.Type()).Elem()
+	cloned.Set(v)
+	return cloned
 }
