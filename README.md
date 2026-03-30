@@ -65,6 +65,11 @@ bin/swmcp stdio --sw-url http://localhost:12800 --sw-username admin --sw-passwor
 bin/swmcp sse --sse-address localhost:8000 --base-path /mcp --sw-url http://localhost:12800
 ```
 
+Transport URL behavior:
+
+- `stdio` can change the backend per session with `set_skywalking_url`, or fall back to `--sw-url`.
+- `sse` and `streamable` always use the configured `--sw-url` value (or the default `http://localhost:12800/graphql`).
+
 ### Usage with Cursor, Copilot, Claude Code
 
 ```json

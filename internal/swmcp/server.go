@@ -131,17 +131,6 @@ func withConfiguredAuth(ctx context.Context) context.Context {
 	return ctx
 }
 
-// urlFromHeaders extracts URL for a request.
-// URL is sourced from Header > configured value > Default.
-func urlFromHeaders(req *http.Request) string {
-	urlStr := req.Header.Get("SW-URL")
-	if urlStr == "" {
-		return configuredSkyWalkingURL()
-	}
-
-	return tools.FinalizeURL(urlStr)
-}
-
 // applySessionOverrides checks for a session in the context and applies any
 // URL or auth overrides that were set via the set_skywalking_url tool.
 func applySessionOverrides(ctx context.Context) context.Context {
@@ -172,22 +161,22 @@ func EnhanceStdioContextFunc() server.StdioContextFunc {
 }
 
 // EnhanceSSEContextFunc returns a SSEContextFunc that enriches the context
-// with SkyWalking settings from SSE request headers and CLI-configured auth.
+// with SkyWalking settings from the CLI configuration and configured auth.
 func EnhanceSSEContextFunc() server.SSEContextFunc {
 	return func(ctx context.Context, req *http.Request) context.Context {
-		urlStr := urlFromHeaders(req)
-		ctx = WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
+		_ = req
+		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
 		ctx = withConfiguredAuth(ctx)
 		return ctx
 	}
 }
 
 // EnhanceHTTPContextFunc returns a HTTPContextFunc that enriches the context
-// with SkyWalking settings from HTTP request headers and CLI-configured auth.
+// with SkyWalking settings from the CLI configuration and configured auth.
 func EnhanceHTTPContextFunc() server.HTTPContextFunc {
 	return func(ctx context.Context, req *http.Request) context.Context {
-		urlStr := urlFromHeaders(req)
-		ctx = WithSkyWalkingURLAndInsecure(ctx, urlStr, false)
+		_ = req
+		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
 		ctx = withConfiguredAuth(ctx)
 		return ctx
 	}
