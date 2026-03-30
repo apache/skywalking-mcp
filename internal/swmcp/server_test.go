@@ -27,7 +27,11 @@ import (
 	"github.com/apache/skywalking-mcp/internal/config"
 )
 
-const sessionOAPURL = "http://session-oap:12800/graphql"
+const (
+	configuredHTTPOAPURL  = "http://configured-oap:12800/graphql"
+	configuredHTTPSOAPURL = "https://configured-oap.example.com/graphql"
+	sessionOAPURL         = "http://session-oap:12800/graphql"
+)
 
 func TestConfiguredSkyWalkingURLUsesDefaultWhenUnset(t *testing.T) {
 	t.Cleanup(viper.Reset)
@@ -107,16 +111,16 @@ func TestWithConfiguredAuthSkipsEmptyUsername(t *testing.T) {
 }
 
 func TestApplySessionOverridesWithoutSessionLeavesContextUnchanged(t *testing.T) {
-	ctx := WithSkyWalkingURLAndInsecure(context.Background(), "http://configured-oap:12800/graphql", false)
+	ctx := WithSkyWalkingURLAndInsecure(context.Background(), configuredHTTPOAPURL, false)
 
 	got := applySessionOverrides(ctx)
-	if gotURL, _ := got.Value(contextkey.BaseURL{}).(string); gotURL != "http://configured-oap:12800/graphql" {
+	if gotURL, _ := got.Value(contextkey.BaseURL{}).(string); gotURL != configuredHTTPOAPURL {
 		t.Fatalf("base URL = %q", gotURL)
 	}
 }
 
 func TestApplySessionOverridesWithURLOnlyKeepsConfiguredAuth(t *testing.T) {
-	ctx := WithSkyWalkingURLAndInsecure(context.Background(), "http://configured-oap:12800/graphql", false)
+	ctx := WithSkyWalkingURLAndInsecure(context.Background(), configuredHTTPOAPURL, false)
 	ctx = WithSkyWalkingAuth(ctx, "configured-user", "configured-pass")
 
 	session := &Session{}
@@ -172,7 +176,7 @@ func TestEnhanceStdioContextFuncUsesConfiguredURLAndAuth(t *testing.T) {
 	ctx := EnhanceStdioContextFunc()(context.Background())
 
 	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
-	if gotURL != "https://configured-oap.example.com/graphql" {
+	if gotURL != configuredHTTPSOAPURL {
 		t.Fatalf("base URL = %q", gotURL)
 	}
 
@@ -195,7 +199,7 @@ func TestEnhanceHTTPContextFuncDoesNotUseSWURLHeader(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	viper.Set("url", "http://configured-oap:12800")
 
-	req, err := http.NewRequest(http.MethodPost, "http://client/request", nil)
+	req, err := http.NewRequest(http.MethodPost, "http://client/request", http.NoBody)
 	if err != nil {
 		t.Fatalf("create request: %v", err)
 	}
@@ -204,7 +208,7 @@ func TestEnhanceHTTPContextFuncDoesNotUseSWURLHeader(t *testing.T) {
 	ctx := EnhanceHTTPContextFunc()(context.Background(), req)
 
 	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
-	if gotURL != "http://configured-oap:12800/graphql" {
+	if gotURL != configuredHTTPOAPURL {
 		t.Fatalf("base URL = %q", gotURL)
 	}
 }
@@ -213,7 +217,7 @@ func TestEnhanceSSEContextFuncDoesNotUseSWURLHeader(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	viper.Set("url", "https://configured-oap.example.com")
 
-	req, err := http.NewRequest(http.MethodGet, "http://client/events", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://client/events", http.NoBody)
 	if err != nil {
 		t.Fatalf("create request: %v", err)
 	}
@@ -222,7 +226,7 @@ func TestEnhanceSSEContextFuncDoesNotUseSWURLHeader(t *testing.T) {
 	ctx := EnhanceSSEContextFunc()(context.Background(), req)
 
 	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
-	if gotURL != "https://configured-oap.example.com/graphql" {
+	if gotURL != configuredHTTPSOAPURL {
 		t.Fatalf("base URL = %q", gotURL)
 	}
 }
