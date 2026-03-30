@@ -26,6 +26,12 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// These registry tests verify that newMCPServer wires up the expected tools,
+// prompts, and resources. mcp-go v0.45.0 does not expose a public inventory API
+// for MCPServer, so the tests read server internals through a single helper
+// layer below. If mcp-go changes its internal field layout, update only the
+// helpers in this file rather than spreading reflect/unsafe access across tests.
+
 func TestNewMCPServerRegistersExpectedToolsForStdio(t *testing.T) {
 	srv := newMCPServer(true)
 
@@ -214,7 +220,7 @@ func TestToolMetadataIncludesExpectedDescriptionsAndSchemas(t *testing.T) {
 }
 
 func toolMap(srv *server.MCPServer) map[string]mcp.Tool {
-	serverTools := readPrivateField(reflect.ValueOf(srv).Elem().FieldByName("tools"))
+	serverTools := mustReadServerField(testedServerValue(srv), "tools")
 	result := make(map[string]mcp.Tool, serverTools.Len())
 
 	iter := serverTools.MapRange()
@@ -228,7 +234,7 @@ func toolMap(srv *server.MCPServer) map[string]mcp.Tool {
 }
 
 func promptMap(srv *server.MCPServer) map[string]mcp.Prompt {
-	serverPrompts := readPrivateField(reflect.ValueOf(srv).Elem().FieldByName("prompts"))
+	serverPrompts := mustReadServerField(testedServerValue(srv), "prompts")
 	result := make(map[string]mcp.Prompt, serverPrompts.Len())
 
 	iter := serverPrompts.MapRange()
@@ -240,7 +246,7 @@ func promptMap(srv *server.MCPServer) map[string]mcp.Prompt {
 }
 
 func resourceMap(srv *server.MCPServer) map[string]mcp.Resource {
-	serverResources := readPrivateField(reflect.ValueOf(srv).Elem().FieldByName("resources"))
+	serverResources := mustReadServerField(testedServerValue(srv), "resources")
 	result := make(map[string]mcp.Resource, serverResources.Len())
 
 	iter := serverResources.MapRange()
@@ -253,8 +259,9 @@ func resourceMap(srv *server.MCPServer) map[string]mcp.Resource {
 }
 
 func sortedToolNames(srv *server.MCPServer) []string {
-	names := make([]string, 0, len(toolMap(srv)))
-	for name := range toolMap(srv) {
+	tools := toolMap(srv)
+	names := make([]string, 0, len(tools))
+	for name := range tools {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -262,8 +269,9 @@ func sortedToolNames(srv *server.MCPServer) []string {
 }
 
 func sortedPromptNames(srv *server.MCPServer) []string {
-	names := make([]string, 0, len(promptMap(srv)))
-	for name := range promptMap(srv) {
+	prompts := promptMap(srv)
+	names := make([]string, 0, len(prompts))
+	for name := range prompts {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -279,6 +287,18 @@ func assertStringSlicesEqual(t *testing.T, got, want []string) {
 
 func readPrivateField(v reflect.Value) reflect.Value {
 	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
+}
+
+func testedServerValue(srv *server.MCPServer) reflect.Value {
+	return reflect.ValueOf(srv).Elem()
+}
+
+func mustReadServerField(srv reflect.Value, fieldName string) reflect.Value {
+	field := srv.FieldByName(fieldName)
+	if !field.IsValid() {
+		panic("mcp-go MCPServer no longer has field " + fieldName)
+	}
+	return readPrivateField(field)
 }
 
 func copyReflectValue(v reflect.Value) reflect.Value {

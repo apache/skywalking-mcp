@@ -18,6 +18,7 @@ package swmcp
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
@@ -187,5 +188,41 @@ func TestEnhanceStdioContextFuncUsesConfiguredURLAndAuth(t *testing.T) {
 
 	if _, ok := ctx.Value(sessionKey{}).(*Session); !ok {
 		t.Fatal("session not attached to stdio context")
+	}
+}
+
+func TestEnhanceHTTPContextFuncDoesNotUseSWURLHeader(t *testing.T) {
+	t.Cleanup(viper.Reset)
+	viper.Set("url", "http://configured-oap:12800")
+
+	req, err := http.NewRequest(http.MethodPost, "http://client/request", nil)
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	req.Header.Set("SW-URL", "http://attacker.invalid:8080")
+
+	ctx := EnhanceHTTPContextFunc()(context.Background(), req)
+
+	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
+	if gotURL != "http://configured-oap:12800/graphql" {
+		t.Fatalf("base URL = %q", gotURL)
+	}
+}
+
+func TestEnhanceSSEContextFuncDoesNotUseSWURLHeader(t *testing.T) {
+	t.Cleanup(viper.Reset)
+	viper.Set("url", "https://configured-oap.example.com")
+
+	req, err := http.NewRequest(http.MethodGet, "http://client/events", nil)
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	req.Header.Set("SW-URL", "https://attacker.invalid")
+
+	ctx := EnhanceSSEContextFunc()(context.Background(), req)
+
+	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
+	if gotURL != "https://configured-oap.example.com/graphql" {
+		t.Fatalf("base URL = %q", gotURL)
 	}
 }
