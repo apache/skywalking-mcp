@@ -48,6 +48,14 @@ build: ## Build the binary.
 		-X ${VERSION_PATH}.date=${BUILD_DATE}" \
 		-o bin/swmcp cmd/skywalking-mcp/main.go
 
+.PHONY: test
+test: ## Run unit tests.
+	go test ./...
+
+.PHONY: test-cover
+test-cover: ## Run unit tests with coverage output in coverage.txt.
+	go test ./... -coverprofile=coverage.txt
+
 $(GO_LINT):
 	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0
 $(LICENSE_EYE):
@@ -139,7 +147,7 @@ PUSH_RELEASE_SCRIPTS := ./scripts/push-release.sh
 release-push-candidate:
 	${PUSH_RELEASE_SCRIPTS}
 
-.PHONY: lint fix-lint
+.PHONY: lint fix-lint test test-cover
 .PHONY: license-header fix-license-header dependency-license fix-dependency-license
 .PHONY: release-binary release-source release-sign release-assembly
 .PHONY: release-push-candidate docker-build-multi
