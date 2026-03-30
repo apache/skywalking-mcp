@@ -31,6 +31,8 @@ PLATFORMS ?= linux/amd64
 MULTI_PLATFORMS ?= linux/amd64,linux/arm64
 OUTPUT ?= --load
 IMAGE_TAGS ?= -t $(IMAGE):$(VERSION) -t $(IMAGE):latest
+GO_TEST_FLAGS ?=
+GO_TEST_PKGS ?= ./...
 
 .PHONY: all
 all: build ;
@@ -50,11 +52,11 @@ build: ## Build the binary.
 
 .PHONY: test
 test: ## Run unit tests.
-	go test ./...
+	go test $(GO_TEST_FLAGS) $(GO_TEST_PKGS)
 
 .PHONY: test-cover
 test-cover: ## Run unit tests with coverage output in coverage.txt.
-	go test ./... -coverprofile=coverage.txt
+	go test $(GO_TEST_FLAGS) -coverprofile=coverage.txt $(GO_TEST_PKGS)
 
 $(GO_LINT):
 	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0

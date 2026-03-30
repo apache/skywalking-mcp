@@ -163,8 +163,7 @@ func EnhanceStdioContextFunc() server.StdioContextFunc {
 // EnhanceSSEContextFunc returns a SSEContextFunc that enriches the context
 // with SkyWalking settings from the CLI configuration and configured auth.
 func EnhanceSSEContextFunc() server.SSEContextFunc {
-	return func(ctx context.Context, req *http.Request) context.Context {
-		_ = req
+	return func(ctx context.Context, _ *http.Request) context.Context {
 		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
 		ctx = withConfiguredAuth(ctx)
 		return ctx
@@ -174,8 +173,7 @@ func EnhanceSSEContextFunc() server.SSEContextFunc {
 // EnhanceHTTPContextFunc returns a HTTPContextFunc that enriches the context
 // with SkyWalking settings from the CLI configuration and configured auth.
 func EnhanceHTTPContextFunc() server.HTTPContextFunc {
-	return func(ctx context.Context, req *http.Request) context.Context {
-		_ = req
+	return func(ctx context.Context, _ *http.Request) context.Context {
 		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
 		ctx = withConfiguredAuth(ctx)
 		return ctx

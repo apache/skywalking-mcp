@@ -118,7 +118,7 @@ This tool configures the connection to SkyWalking OAP for all subsequent tool ca
 The URL and credentials persist for the lifetime of the session.
 
 Priority: session URL (set by this tool) > --sw-url flag > default (http://localhost:12800/graphql)
-For SSE/HTTP transports, use the SW-URL HTTP header or --sw-url flag instead.
+For SSE/HTTP transports, use the --sw-url flag instead.
 
 Credentials support raw values or environment variable references using ${ENV_VAR} syntax.
 
