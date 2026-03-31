@@ -25,8 +25,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"regexp"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -40,6 +42,16 @@ func AddMQETools(mcp *server.MCPServer) {
 	MQEMetricsListTool.Register(mcp)
 	MQEMetricsTypeTool.Register(mcp)
 }
+
+const (
+	maxMQEExpressionLength = 2048
+	maxMQEExpressionDepth  = 12
+	maxMQEEntityFieldLen   = 256
+	maxMQERegexLength      = 256
+	maxMetricNameLength    = 128
+)
+
+var metricNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
 
 // GraphQLRequest represents a GraphQL request
 type GraphQLRequest struct {
@@ -101,8 +113,8 @@ func executeGraphQLWithContext(ctx context.Context, query string, variables map[
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("HTTP request failed with status: %d, body: %s", resp.StatusCode, string(bodyBytes))
+		_, _ = io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("GraphQL request failed with HTTP status %d", resp.StatusCode)
 	}
 
 	var graphqlResp GraphQLResponse
@@ -111,11 +123,7 @@ func executeGraphQLWithContext(ctx context.Context, query string, variables map[
 	}
 
 	if len(graphqlResp.Errors) > 0 {
-		var errorMsgs []string
-		for _, err := range graphqlResp.Errors {
-			errorMsgs = append(errorMsgs, err.Message)
-		}
-		return nil, fmt.Errorf("GraphQL errors: %s", strings.Join(errorMsgs, ", "))
+		return nil, fmt.Errorf("GraphQL query failed")
 	}
 
 	return &graphqlResp, nil
@@ -307,6 +315,9 @@ func executeMQEExpression(ctx context.Context, req *MQEExpressionRequest) (*mcp.
 	if req.Expression == "" {
 		return mcp.NewToolResultError("expression is required"), nil
 	}
+	if err := validateMQEExpressionRequest(req); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 
 	entity := buildMQEEntity(ctx, req)
 	timeCtx := GetTimeContext(ctx)
@@ -386,6 +397,10 @@ func executeMQEExpression(ctx context.Context, req *MQEExpressionRequest) (*mcp.
 
 // listMQEMetrics lists available metrics
 func listMQEMetrics(ctx context.Context, req *MQEMetricsListRequest) (*mcp.CallToolResult, error) {
+	if err := validateMQEMetricsListRequest(req); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
 	// GraphQL query for listing metrics
 	query := `
 		query listMetrics($regex: String) {
@@ -438,6 +453,9 @@ func getMQEMetricsType(ctx context.Context, req *MQEMetricsTypeRequest) (*mcp.Ca
 	if req.MetricName == "" {
 		return mcp.NewToolResultError("metric_name must be provided"), nil
 	}
+	if err := validateMetricName(req.MetricName); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 
 	// GraphQL query for getting metric type
 	query := `
@@ -460,6 +478,114 @@ func getMQEMetricsType(ctx context.Context, req *MQEMetricsTypeRequest) (*mcp.Ca
 		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
 	}
 	return mcp.NewToolResultText(string(jsonBytes)), nil
+}
+
+func validateMQEExpressionRequest(req *MQEExpressionRequest) error {
+	if err := validateMQEExpression(req.Expression); err != nil {
+		return err
+	}
+
+	for fieldName, value := range map[string]string{
+		"service_name":               req.ServiceName,
+		"layer":                      req.Layer,
+		"service_instance_name":      req.ServiceInstanceName,
+		"endpoint_name":              req.EndpointName,
+		"process_name":               req.ProcessName,
+		"dest_service_name":          req.DestServiceName,
+		"dest_layer":                 req.DestLayer,
+		"dest_service_instance_name": req.DestServiceInstanceName,
+		"dest_endpoint_name":         req.DestEndpointName,
+		"dest_process_name":          req.DestProcessName,
+	} {
+		if err := validateMQETextField(fieldName, value, maxMQEEntityFieldLen); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateMQEMetricsListRequest(req *MQEMetricsListRequest) error {
+	if req == nil || req.Regex == "" {
+		return nil
+	}
+	if err := validateMQETextField("regex", req.Regex, maxMQERegexLength); err != nil {
+		return err
+	}
+	if _, err := regexp.Compile(req.Regex); err != nil {
+		return fmt.Errorf("regex is invalid")
+	}
+	return nil
+}
+
+func validateMetricName(metricName string) error {
+	if err := validateMQETextField("metric_name", metricName, maxMetricNameLength); err != nil {
+		return err
+	}
+	if !metricNamePattern.MatchString(metricName) {
+		return fmt.Errorf("metric_name contains invalid characters")
+	}
+	return nil
+}
+
+func validateMQEExpression(expression string) error {
+	if !utf8.ValidString(expression) {
+		return fmt.Errorf("expression must be valid UTF-8")
+	}
+	if len(expression) > maxMQEExpressionLength {
+		return fmt.Errorf("expression exceeds maximum length of %d characters", maxMQEExpressionLength)
+	}
+	if containsUnsafeControlChars(expression) {
+		return fmt.Errorf("expression contains invalid control characters")
+	}
+	if nestingDepth(expression) > maxMQEExpressionDepth {
+		return fmt.Errorf("expression exceeds maximum nesting depth of %d", maxMQEExpressionDepth)
+	}
+	return nil
+}
+
+func validateMQETextField(fieldName, value string, maxLen int) error {
+	if value == "" {
+		return nil
+	}
+	if !utf8.ValidString(value) {
+		return fmt.Errorf("%s must be valid UTF-8", fieldName)
+	}
+	if len(value) > maxLen {
+		return fmt.Errorf("%s exceeds maximum length of %d characters", fieldName, maxLen)
+	}
+	if containsUnsafeControlChars(value) {
+		return fmt.Errorf("%s contains invalid control characters", fieldName)
+	}
+	return nil
+}
+
+func containsUnsafeControlChars(value string) bool {
+	for _, r := range value {
+		if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+			return true
+		}
+	}
+	return false
+}
+
+func nestingDepth(value string) int {
+	depth := 0
+	maxDepth := 0
+	for _, r := range value {
+		switch r {
+		case '(', '{', '[':
+			depth++
+			if depth > maxDepth {
+				maxDepth = depth
+			}
+		case ')', '}', ']':
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
+	return maxDepth
 }
 
 var MQEExpressionTool = NewTool(
