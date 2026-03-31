@@ -65,6 +65,11 @@ bin/swmcp stdio --sw-url http://localhost:12800 --sw-username admin --sw-passwor
 bin/swmcp sse --sse-address localhost:8000 --base-path /mcp --sw-url http://localhost:12800
 ```
 
+Transport URL behavior:
+
+- `stdio`, `sse`, and `streamable` all use the configured `--sw-url` value (or the default `http://localhost:12800/graphql`).
+- `sse` and `streamable` ignore request-level URL override headers.
+
 ### Usage with Cursor, Copilot, Claude Code
 
 ```json
@@ -128,7 +133,6 @@ SkyWalking MCP provides the following tools to query and analyze SkyWalking OAP 
 
 | Category     | Tool Name                      | Description                                                                                       |
 |--------------|--------------------------------|---------------------------------------------------------------------------------------------------|
-| **Session**  | `set_skywalking_url`           | Set the SkyWalking OAP server URL and optional basic auth credentials for the current session (stdio mode only). Supports `${ENV_VAR}` syntax for credentials. |
 | **Trace**    | `query_traces`                 | Query traces with multi-condition filtering (service, endpoint, state, tags, and time range via start/end/step). Supports `full`, `summary`, and `errors_only` views with performance insights. |
 | **Log**      | `query_logs`                   | Query logs with filters for service, instance, endpoint, trace ID, tags, and time range. Supports cold storage and pagination. |
 | **MQE**      | `execute_mqe_expression`       | Execute MQE (Metrics Query Expression) to query and calculate metrics data. Supports calculations, aggregations, TopN, trend analysis, and multiple result types. |

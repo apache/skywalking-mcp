@@ -32,7 +32,7 @@ make build-image      # Build Docker image skywalking-mcp:latest
 make clean            # Remove build artifacts
 ```
 
-No unit tests exist yet. CI runs license checks, lint, and docker build.
+Unit tests exist for selected transport/context behavior. CI runs license checks, lint, and docker build.
 
 ## Architecture
 
@@ -41,12 +41,11 @@ No unit tests exist yet. CI runs license checks, lint, and docker build.
 Three MCP transport modes as cobra subcommands: `stdio`, `sse`, `streamable`.
 
 The SkyWalking OAP URL is resolved in priority order:
-- **stdio**: `set_skywalking_url` session tool > `--sw-url` flag > `http://localhost:12800/graphql`
-- **SSE/HTTP**: `SW-URL` HTTP header > `--sw-url` flag > `http://localhost:12800/graphql`
+- **All transports**: `--sw-url` flag > `http://localhost:12800/graphql`
 
-The `set_skywalking_url` tool is only available in stdio mode (single client, well-defined session). SSE and HTTP transports use per-request headers instead.
+SSE and HTTP transports always use the configured server URL.
 
-Basic auth is configured via `--sw-username` / `--sw-password` flags. Both flags (and the `set_skywalking_url` tool) support `${ENV_VAR}` syntax to resolve credentials from environment variables (e.g. `--sw-password ${MY_SECRET}`).
+Basic auth is configured via `--sw-username` / `--sw-password` flags. The startup flags support `${ENV_VAR}` syntax to resolve credentials from environment variables (e.g. `--sw-password ${MY_SECRET}`).
 
 Each transport injects the OAP URL and auth into the request context via `WithSkyWalkingURLAndInsecure()` and `WithSkyWalkingAuth()`. Tools extract them downstream using `skywalking-cli`'s `contextkey.BaseURL{}`, `contextkey.Username{}`, and `contextkey.Password{}`.
 

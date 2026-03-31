@@ -57,7 +57,7 @@ func NewStreamable() *cobra.Command {
 // runStreamableServer starts the Streamable server with the provided configuration.
 func runStreamableServer(cfg *config.StreamableServerConfig) error {
 	httpServer := server.NewStreamableHTTPServer(
-		newMCPServer(false),
+		newMCPServer(),
 		server.WithStateLess(true),
 		server.WithLogger(log.StandardLogger()),
 		server.WithHTTPContextFunc(EnhanceHTTPContextFunc()),

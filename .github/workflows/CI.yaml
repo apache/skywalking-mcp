@@ -67,6 +67,9 @@ jobs:
       - name: Lint
         run: make lint
 
+      - name: Test
+        run: make test
+
       - name: Build Docker images
         run: make docker
 

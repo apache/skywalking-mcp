@@ -31,6 +31,8 @@ PLATFORMS ?= linux/amd64
 MULTI_PLATFORMS ?= linux/amd64,linux/arm64
 OUTPUT ?= --load
 IMAGE_TAGS ?= -t $(IMAGE):$(VERSION) -t $(IMAGE):latest
+GO_TEST_FLAGS ?=
+GO_TEST_PKGS ?= ./...
 
 .PHONY: all
 all: build ;
@@ -47,6 +49,14 @@ build: ## Build the binary.
 		-X ${VERSION_PATH}.commit=${GIT_COMMIT} \
 		-X ${VERSION_PATH}.date=${BUILD_DATE}" \
 		-o bin/swmcp cmd/skywalking-mcp/main.go
+
+.PHONY: test
+test: ## Run unit tests.
+	go test $(GO_TEST_FLAGS) $(GO_TEST_PKGS)
+
+.PHONY: test-cover
+test-cover: ## Run unit tests with coverage output in coverage.txt.
+	go test $(GO_TEST_FLAGS) -coverprofile=coverage.txt $(GO_TEST_PKGS)
 
 $(GO_LINT):
 	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0
@@ -139,7 +149,7 @@ PUSH_RELEASE_SCRIPTS := ./scripts/push-release.sh
 release-push-candidate:
 	${PUSH_RELEASE_SCRIPTS}
 
-.PHONY: lint fix-lint
+.PHONY: lint fix-lint test test-cover
 .PHONY: license-header fix-license-header dependency-license fix-dependency-license
 .PHONY: release-binary release-source release-sign release-assembly
 .PHONY: release-push-candidate docker-build-multi
