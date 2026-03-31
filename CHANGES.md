@@ -12,9 +12,9 @@ Release Notes.
 * URL scheme validation rejects non-http/https OAP URLs.
 * Regex patterns supplied to `list_mqe_metrics` are validated for complexity before compilation.
 * Added `--allowed-origins` flag to `sse` and `streamable` transports for CORS/CSRF origin enforcement. Requests carrying an `Origin` header not in the allowlist receive `403 Forbidden`. When unset, all origins are permitted (backward compatible).
-* Implement unit tests.
-* Remove the unnecessary tool and parameter.
-* Validate properties for tools.
+* Increased reliability of core CLI commands through expanded automated test coverage.
+* Removed an unused CLI tool and its associated parameter to simplify the interface and avoid confusion.
+* Added validation for tool configuration properties, returning clear errors when required values are missing or invalid.
 
 ## 0.1.0
 
