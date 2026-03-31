@@ -27,10 +27,11 @@ import (
 )
 
 // These registry tests verify that newMCPServer wires up the expected tools,
-// prompts, and resources. mcp-go v0.45.0 does not expose a public inventory API
-// for MCPServer, so the tests read server internals through a single helper
-// layer below. If mcp-go changes its internal field layout, update only the
-// helpers in this file rather than spreading reflect/unsafe access across tests.
+// prompts, and resources. Prefer MCPServer public APIs where available. As of
+// mcp-go v0.45.0 only tools have a public inventory API, so prompt/resource
+// assertions go through the helper layer below. If a future mcp-go release
+// exposes prompt/resource listing, replace the reflection helper there rather
+// than spreading reflect/unsafe access across tests.
 
 func TestNewMCPServerRegistersExpectedTools(t *testing.T) {
 	srv := newMCPServer()
@@ -60,8 +61,9 @@ func TestNewMCPServerRegistersExpectedTools(t *testing.T) {
 
 func TestNewMCPServerRegistersExpectedPrompts(t *testing.T) {
 	srv := newMCPServer()
+	inventory := inspectServerInventory(srv)
 
-	got := sortedPromptNames(srv)
+	got := sortedPromptNames(inventory.prompts)
 	want := []string{
 		"analyze-logs",
 		"analyze-performance",
@@ -80,8 +82,9 @@ func TestNewMCPServerRegistersExpectedPrompts(t *testing.T) {
 
 func TestNewMCPServerRegistersExpectedResources(t *testing.T) {
 	srv := newMCPServer()
+	inventory := inspectServerInventory(srv)
 
-	resources := resourceMap(srv)
+	resources := inventory.resources
 	got := make([]string, 0, len(resources))
 	for uri := range resources {
 		got = append(got, uri)
@@ -100,7 +103,7 @@ func TestNewMCPServerRegistersExpectedResources(t *testing.T) {
 
 func TestPromptMetadataIncludesExpectedArguments(t *testing.T) {
 	srv := newMCPServer()
-	prompts := promptMap(srv)
+	prompts := inspectServerInventory(srv).prompts
 
 	prompt, ok := prompts["generate_duration"]
 	if !ok {
@@ -130,7 +133,7 @@ func TestPromptMetadataIncludesExpectedArguments(t *testing.T) {
 
 func TestResourceMetadataIncludesExpectedMIMETypes(t *testing.T) {
 	srv := newMCPServer()
-	resources := resourceMap(srv)
+	resources := inspectServerInventory(srv).resources
 
 	tests := []struct {
 		uri      string
@@ -192,39 +195,10 @@ func TestToolMetadataIncludesExpectedDescriptionsAndSchemas(t *testing.T) {
 }
 
 func toolMap(srv *server.MCPServer) map[string]mcp.Tool {
-	serverTools := mustReadServerField(testedServerValue(srv), "tools")
-	result := make(map[string]mcp.Tool, serverTools.Len())
-
-	iter := serverTools.MapRange()
-	for iter.Next() {
-		name := iter.Key().String()
-		toolValue := copyReflectValue(iter.Value())
-		result[name] = toolValue.FieldByName("Tool").Interface().(mcp.Tool)
-	}
-
-	return result
-}
-
-func promptMap(srv *server.MCPServer) map[string]mcp.Prompt {
-	serverPrompts := mustReadServerField(testedServerValue(srv), "prompts")
-	result := make(map[string]mcp.Prompt, serverPrompts.Len())
-
-	iter := serverPrompts.MapRange()
-	for iter.Next() {
-		result[iter.Key().String()] = copyReflectValue(iter.Value()).Interface().(mcp.Prompt)
-	}
-
-	return result
-}
-
-func resourceMap(srv *server.MCPServer) map[string]mcp.Resource {
-	serverResources := mustReadServerField(testedServerValue(srv), "resources")
-	result := make(map[string]mcp.Resource, serverResources.Len())
-
-	iter := serverResources.MapRange()
-	for iter.Next() {
-		resourceField := copyReflectValue(iter.Value()).FieldByName("resource")
-		result[iter.Key().String()] = readPrivateField(resourceField).Interface().(mcp.Resource)
+	serverTools := srv.ListTools()
+	result := make(map[string]mcp.Tool, len(serverTools))
+	for name, tool := range serverTools {
+		result[name] = tool.Tool
 	}
 
 	return result
@@ -240,8 +214,7 @@ func sortedToolNames(srv *server.MCPServer) []string {
 	return names
 }
 
-func sortedPromptNames(srv *server.MCPServer) []string {
-	prompts := promptMap(srv)
+func sortedPromptNames(prompts map[string]mcp.Prompt) []string {
 	names := make([]string, 0, len(prompts))
 	for name := range prompts {
 		names = append(names, name)
@@ -271,6 +244,44 @@ func mustReadServerField(srv reflect.Value, fieldName string) reflect.Value {
 		panic("mcp-go MCPServer no longer has field " + fieldName)
 	}
 	return readPrivateField(field)
+}
+
+type serverInventory struct {
+	prompts   map[string]mcp.Prompt
+	resources map[string]mcp.Resource
+}
+
+func inspectServerInventory(srv *server.MCPServer) serverInventory {
+	serverValue := testedServerValue(srv)
+	return serverInventory{
+		prompts:   readPromptMap(serverValue),
+		resources: readResourceMap(serverValue),
+	}
+}
+
+func readPromptMap(serverValue reflect.Value) map[string]mcp.Prompt {
+	serverPrompts := mustReadServerField(serverValue, "prompts")
+	result := make(map[string]mcp.Prompt, serverPrompts.Len())
+
+	iter := serverPrompts.MapRange()
+	for iter.Next() {
+		result[iter.Key().String()] = copyReflectValue(iter.Value()).Interface().(mcp.Prompt)
+	}
+
+	return result
+}
+
+func readResourceMap(serverValue reflect.Value) map[string]mcp.Resource {
+	serverResources := mustReadServerField(serverValue, "resources")
+	result := make(map[string]mcp.Resource, serverResources.Len())
+
+	iter := serverResources.MapRange()
+	for iter.Next() {
+		resourceField := copyReflectValue(iter.Value()).FieldByName("resource")
+		result[iter.Key().String()] = readPrivateField(resourceField).Interface().(mcp.Resource)
+	}
+
+	return result
 }
 
 func copyReflectValue(v reflect.Value) reflect.Value {

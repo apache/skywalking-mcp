@@ -55,6 +55,9 @@ const (
 
 var metricNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
 
+// layerPattern restricts layer values to the SkyWalking enum format (e.g. GENERAL, K8S_SERVICE).
+var layerPattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
+
 // GraphQLRequest represents a GraphQL request
 type GraphQLRequest struct {
 	Query     string                 `json:"query"`
@@ -506,12 +509,10 @@ func validateMQEExpressionRequest(req *MQEExpressionRequest) error {
 
 	for fieldName, value := range map[string]string{
 		"service_name":               req.ServiceName,
-		"layer":                      req.Layer,
 		"service_instance_name":      req.ServiceInstanceName,
 		"endpoint_name":              req.EndpointName,
 		"process_name":               req.ProcessName,
 		"dest_service_name":          req.DestServiceName,
-		"dest_layer":                 req.DestLayer,
 		"dest_service_instance_name": req.DestServiceInstanceName,
 		"dest_endpoint_name":         req.DestEndpointName,
 		"dest_process_name":          req.DestProcessName,
@@ -519,6 +520,13 @@ func validateMQEExpressionRequest(req *MQEExpressionRequest) error {
 		if err := validateMQETextField(fieldName, value, maxMQEEntityFieldLen); err != nil {
 			return err
 		}
+	}
+
+	if err := validateLayerField("layer", req.Layer); err != nil {
+		return err
+	}
+	if err := validateLayerField("dest_layer", req.DestLayer); err != nil {
+		return err
 	}
 
 	return nil
@@ -557,6 +565,19 @@ func regexNodeCount(re *syntax.Regexp) int {
 		count += regexNodeCount(sub)
 	}
 	return count
+}
+
+func validateLayerField(fieldName, value string) error {
+	if value == "" {
+		return nil
+	}
+	if err := validateMQETextField(fieldName, value, maxMQEEntityFieldLen); err != nil {
+		return err
+	}
+	if !layerPattern.MatchString(value) {
+		return fmt.Errorf("%s contains invalid characters: only uppercase letters, digits, and underscores are allowed", fieldName)
+	}
+	return nil
 }
 
 func validateMetricName(metricName string) error {

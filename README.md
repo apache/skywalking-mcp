@@ -35,7 +35,7 @@ Available Commands:
   stdio       Start stdio server
   streamable  Start Streamable server
 
-Flags:
+Global Flags:
   -h, --help                 help for swmcp
       --log-command          When true, log commands to the log file
       --log-file string      Path to log file
@@ -46,6 +46,16 @@ Flags:
       --sw-password string   Password for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)
       --sw-insecure          Skip TLS certificate verification for OAP connections (use only in development)
   -v, --version              version for swmcp
+
+SSE-specific Flags:
+      --sse-address string     Host and port for the SSE server (default "localhost:8000")
+      --base-path string       Base path for the SSE server
+      --allowed-origins string Comma-separated list of allowed CORS origins. Empty permits all.
+
+Streamable-specific Flags:
+      --address string         Host and port for the Streamable HTTP server (default "localhost:8000")
+      --endpoint-path string   Endpoint path for the Streamable HTTP server (default "/mcp")
+      --allowed-origins string Comma-separated list of allowed CORS origins. Empty permits all.
 
 Use "swmcp [command] --help" for more information about a command.
 ```
@@ -67,6 +77,9 @@ bin/swmcp stdio --sw-url https://localhost:12800 --sw-insecure
 
 # or use SSE server
 bin/swmcp sse --sse-address localhost:8000 --base-path /mcp --sw-url http://localhost:12800
+
+# restrict CORS to specific origins (SSE and streamable transports)
+bin/swmcp streamable --sw-url http://localhost:12800 --allowed-origins "http://localhost:3000,https://app.example.com"
 ```
 
 Transport URL behavior:

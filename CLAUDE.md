@@ -45,9 +45,15 @@ The SkyWalking OAP URL is resolved in priority order:
 
 SSE and HTTP transports always use the configured server URL.
 
-Basic auth is configured via `--sw-username` / `--sw-password` flags. The startup flags support `${ENV_VAR}` syntax to resolve credentials from environment variables (e.g. `--sw-password ${MY_SECRET}`).
+Basic auth is configured via `--sw-username` / `--sw-password` flags. The startup flags support `${ENV_VAR}` syntax to resolve credentials from environment variables (e.g. `--sw-password ${MY_SECRET}`). If a referenced env var is not set, a warning is logged and the credential is treated as empty.
 
-Each transport injects the OAP URL and auth into the request context via `WithSkyWalkingURLAndInsecure()` and `WithSkyWalkingAuth()`. Tools extract them downstream using `skywalking-cli`'s `contextkey.BaseURL{}`, `contextkey.Username{}`, and `contextkey.Password{}`.
+TLS verification is enforced by default. Use `--sw-insecure` to skip verification (development/self-signed certs only).
+
+Each transport injects the OAP URL, insecure flag, and auth into the request context via `WithSkyWalkingURLAndInsecure()` and `WithSkyWalkingAuth()`. Tools extract them downstream using `skywalking-cli`'s `contextkey.BaseURL{}`, `contextkey.Insecure{}`, `contextkey.Username{}`, and `contextkey.Password{}`.
+
+### CORS / CSRF (`internal/swmcp/cors.go`)
+
+`sse` and `streamable` transports support `--allowed-origins` (comma-separated). When set, requests with an `Origin` header not in the list are rejected with `403 Forbidden`. CORS response headers are set for allowed origins. When the flag is empty (default), all origins are permitted. The middleware is injected via `WithHTTPServer` / `WithStreamableHTTPServer` so the MCP handler is wrapped rather than forked.
 
 ### Server Wiring (`internal/swmcp/server.go`)
 
@@ -60,8 +66,18 @@ Each transport injects the OAP URL and auth into the request context via `WithSk
 ### Communication with SkyWalking OAP
 
 - **Most tools** use `skywalking-cli` packages (`pkg/graphql/...`) which communicate via GraphQL
-- **MQE tools** use direct HTTP calls to the OAP `/graphql` endpoint
+- **MQE tools** use direct HTTP calls to the OAP `/graphql` endpoint via `executeGraphQLWithContext()` in `mqe.go`. The HTTP client reads `contextkey.Insecure{}` to configure TLS and validates the URL scheme (`http`/`https` only) before each request.
 - **Time handling**: `common.go` provides `BuildDurationWithContext()` and `GetTimeContext()` which fetch the OAP server's time/timezone for accurate duration calculations
+
+### Input Validation (`internal/tools/mqe.go`)
+
+All MQE tool inputs are validated before use:
+- `validateMQETextField`: UTF-8, max length, no control characters — applied to all entity fields
+- `validateLayerField`: additionally enforces `^[A-Z0-9_]+$` for `layer` / `dest_layer`
+- `validateMQEExpression`: UTF-8, max 2048 chars, no control characters, max nesting depth 12
+- `validateMetricName`: `^[A-Za-z0-9_.:-]+$` pattern, max 128 chars
+- `validateRegexComplexity`: parses the regex AST via `regexp/syntax` and rejects patterns with >50 nodes
+- `validateURLScheme` (`common.go`): rejects non-http/https OAP URLs before HTTP requests
 
 ## Extending the Server
 

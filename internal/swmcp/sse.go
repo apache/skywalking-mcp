@@ -55,8 +55,11 @@ func NewSSEServer() *cobra.Command {
 		"The host and port to start the sse server on")
 	sseCmd.Flags().String("base-path", "",
 		"Base path for the sse server")
+	sseCmd.Flags().String("allowed-origins", "",
+		"Comma-separated list of allowed CORS origins (e.g. http://localhost:3000,https://app.example.com). Empty allows all.")
 	_ = viper.BindPFlag("sse-address", sseCmd.Flags().Lookup("sse-address"))
 	_ = viper.BindPFlag("base-path", sseCmd.Flags().Lookup("base-path"))
+	_ = viper.BindPFlag("allowed-origins", sseCmd.Flags().Lookup("allowed-origins"))
 
 	return sseCmd
 }
@@ -71,11 +74,25 @@ func runSSEServer(ctx context.Context, cfg *config.SSEServerConfig) error {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
+	allowedOrigins := parseAllowedOrigins(viper.GetString("allowed-origins"))
+
+	// sseServer is assigned after NewSSEServer so the CORS handler closure
+	// can forward to it via the captured pointer variable.
+	var sseServerRef *server.SSEServer
+	customSrv := &http.Server{
+		Handler: corsMiddleware(allowedOrigins, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			sseServerRef.ServeHTTP(w, r)
+		})),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
 	sseServer := server.NewSSEServer(
 		newMCPServer(),
 		server.WithStaticBasePath(cfg.BasePath),
 		server.WithSSEContextFunc(EnhanceSSEContextFunc()),
+		server.WithHTTPServer(customSrv),
 	)
+	sseServerRef = sseServer
 	ssePath := sseServer.CompleteSsePath()
 	log.Printf("Starting SkyWalking MCP server using SSE transport listening on http://%s%s\n ", cfg.Address, ssePath)
 
