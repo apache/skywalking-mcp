@@ -23,6 +23,13 @@ import (
 	api "skywalking.apache.org/repo/goapi/query"
 )
 
+const (
+	// testTimeStart / testTimeEnd are the formatted minute-step values for
+	// now=2026-03-31T12:00 UTC minus/plus 2 h, used across multiple tests here.
+	testTimeStart = "2026-03-31 1000"
+	testTimeEnd   = "2026-03-31 1200"
+)
+
 func TestFinalizeURL(t *testing.T) {
 	tests := []struct {
 		name string

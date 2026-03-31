@@ -169,3 +169,38 @@ func TestEnhanceSSEContextFuncDoesNotUseSWURLHeader(t *testing.T) {
 		t.Fatalf("base URL = %q", gotURL)
 	}
 }
+
+func TestInsecureFlagDefaultsToFalse(t *testing.T) {
+	t.Cleanup(viper.Reset)
+
+	req, _ := http.NewRequest(http.MethodGet, "http://client/events", http.NoBody)
+
+	for name, ctx := range map[string]context.Context{
+		"stdio":      EnhanceStdioContextFunc()(context.Background()),
+		"sse":        EnhanceSSEContextFunc()(context.Background(), req),
+		"streamable": EnhanceHTTPContextFunc()(context.Background(), req),
+	} {
+		insecure, _ := ctx.Value(contextkey.Insecure{}).(bool)
+		if insecure {
+			t.Errorf("%s: contextkey.Insecure{} should default to false", name)
+		}
+	}
+}
+
+func TestInsecureFlagPropagatedToContext(t *testing.T) {
+	t.Cleanup(viper.Reset)
+	viper.Set("insecure", true)
+
+	req, _ := http.NewRequest(http.MethodGet, "http://client/events", http.NoBody)
+
+	for name, ctx := range map[string]context.Context{
+		"stdio":      EnhanceStdioContextFunc()(context.Background()),
+		"sse":        EnhanceSSEContextFunc()(context.Background(), req),
+		"streamable": EnhanceHTTPContextFunc()(context.Background(), req),
+	} {
+		insecure, ok := ctx.Value(contextkey.Insecure{}).(bool)
+		if !ok || !insecure {
+			t.Errorf("%s: contextkey.Insecure{} should be true when viper insecure=true", name)
+		}
+	}
+}

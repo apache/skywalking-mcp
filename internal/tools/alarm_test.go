@@ -23,11 +23,6 @@ import (
 	api "skywalking.apache.org/repo/goapi/query"
 )
 
-const (
-	testTimeStart = "2026-03-31 1000"
-	testTimeEnd   = "2026-03-31 1200"
-)
-
 func TestBuildAlarmQueryCondition(t *testing.T) {
 	timeCtx := TimeContext{
 		NowUTC:   time.Date(2026, 3, 31, 12, 0, 0, 0, time.UTC),

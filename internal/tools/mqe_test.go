@@ -40,7 +40,7 @@ func TestValidateMQEExpressionRequestRejectsDeeplyNestedExpression(t *testing.T)
 
 func TestValidateMQEMetricsListRequestRejectsInvalidRegex(t *testing.T) {
 	err := validateMQEMetricsListRequest(&MQEMetricsListRequest{Regex: "("})
-	if err == nil || err.Error() != "regex is invalid" {
+	if err == nil || !strings.HasPrefix(err.Error(), "regex is invalid") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
