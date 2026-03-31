@@ -20,12 +20,14 @@ package tools
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
+	"regexp/syntax"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -53,6 +55,9 @@ const (
 
 var metricNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
 
+// layerPattern restricts layer values to the SkyWalking enum format (e.g. GENERAL, K8S_SERVICE).
+var layerPattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
+
 // GraphQLRequest represents a GraphQL request
 type GraphQLRequest struct {
 	Query     string                 `json:"query"`
@@ -75,10 +80,22 @@ func getContextString(ctx context.Context, key any) string {
 	return ""
 }
 
+// getContextBool safely extracts a bool value from context.
+func getContextBool(ctx context.Context, key any) bool {
+	if v, ok := ctx.Value(key).(bool); ok {
+		return v
+	}
+	return false
+}
+
 // executeGraphQLWithContext executes a GraphQL query using URL and auth from context.
 func executeGraphQLWithContext(ctx context.Context, query string, variables map[string]interface{}) (*GraphQLResponse, error) {
-	url := getContextString(ctx, contextkey.BaseURL{})
-	url = FinalizeURL(url)
+	rawURL := getContextString(ctx, contextkey.BaseURL{})
+	rawURL = FinalizeURL(rawURL)
+
+	if err := validateURLScheme(rawURL); err != nil {
+		return nil, err
+	}
 
 	reqBody := GraphQLRequest{
 		Query:     query,
@@ -90,7 +107,7 @@ func executeGraphQLWithContext(ctx context.Context, query string, variables map[
 		return nil, fmt.Errorf("failed to marshal GraphQL request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", rawURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
@@ -105,7 +122,10 @@ func executeGraphQLWithContext(ctx context.Context, query string, variables map[
 		req.Header.Set("Authorization", auth)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	insecure := getContextBool(ctx, contextkey.Insecure{})
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecure} //nolint:gosec // controlled by --sw-insecure operator flag
+	client := &http.Client{Transport: transport, Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute HTTP request: %w", err)
@@ -487,12 +507,10 @@ func validateMQEExpressionRequest(req *MQEExpressionRequest) error {
 
 	for fieldName, value := range map[string]string{
 		"service_name":               req.ServiceName,
-		"layer":                      req.Layer,
 		"service_instance_name":      req.ServiceInstanceName,
 		"endpoint_name":              req.EndpointName,
 		"process_name":               req.ProcessName,
 		"dest_service_name":          req.DestServiceName,
-		"dest_layer":                 req.DestLayer,
 		"dest_service_instance_name": req.DestServiceInstanceName,
 		"dest_endpoint_name":         req.DestEndpointName,
 		"dest_process_name":          req.DestProcessName,
@@ -500,6 +518,13 @@ func validateMQEExpressionRequest(req *MQEExpressionRequest) error {
 		if err := validateMQETextField(fieldName, value, maxMQEEntityFieldLen); err != nil {
 			return err
 		}
+	}
+
+	if err := validateLayerField("layer", req.Layer); err != nil {
+		return err
+	}
+	if err := validateLayerField("dest_layer", req.DestLayer); err != nil {
+		return err
 	}
 
 	return nil
@@ -512,8 +537,43 @@ func validateMQEMetricsListRequest(req *MQEMetricsListRequest) error {
 	if err := validateMQETextField("regex", req.Regex, maxMQERegexLength); err != nil {
 		return err
 	}
-	if _, err := regexp.Compile(req.Regex); err != nil {
-		return fmt.Errorf("regex is invalid")
+	if err := validateRegexComplexity(req.Regex); err != nil {
+		return err
+	}
+	return nil
+}
+
+const maxRegexNodes = 50
+
+// validateRegexComplexity rejects patterns with excessive AST node counts.
+func validateRegexComplexity(pattern string) error {
+	re, err := syntax.Parse(pattern, syntax.Perl)
+	if err != nil {
+		return fmt.Errorf("regex is invalid: %w", err)
+	}
+	if regexNodeCount(re) > maxRegexNodes {
+		return fmt.Errorf("regex is too complex")
+	}
+	return nil
+}
+
+func regexNodeCount(re *syntax.Regexp) int {
+	count := 1
+	for _, sub := range re.Sub {
+		count += regexNodeCount(sub)
+	}
+	return count
+}
+
+func validateLayerField(fieldName, value string) error {
+	if value == "" {
+		return nil
+	}
+	if err := validateMQETextField(fieldName, value, maxMQEEntityFieldLen); err != nil {
+		return err
+	}
+	if !layerPattern.MatchString(value) {
+		return fmt.Errorf("%s contains invalid characters: only uppercase letters, digits, and underscores are allowed", fieldName)
 	}
 	return nil
 }

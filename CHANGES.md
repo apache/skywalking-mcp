@@ -2,6 +2,20 @@
 
 Release Notes.
 
+## 0.2.0
+
+### Features
+
+* TLS certificate verification is now enforced for OAP connections. Added `--sw-insecure` flag to opt out (development/self-signed certs only).
+* Sensitive fields (`authorization`, `password`, `token`, `secret`) are redacted in `--log-command` output.
+* Environment variable references (`${VAR}`) in `--sw-username`/`--sw-password` now log a warning when the variable is not set, preventing silent unauthenticated requests.
+* URL scheme validation rejects non-http/https OAP URLs.
+* Regex patterns supplied to `list_mqe_metrics` are validated for complexity before compilation.
+* Added `--allowed-origins` flag to `sse` and `streamable` transports for CORS origin enforcement. When unset (default), any `Origin` is reflected back so all browser origins work out of the box. When set, only listed origins receive CORS headers; all others get `403 Forbidden`. Use `*` as an entry to send the wildcard header explicitly.
+* Increased reliability of core CLI commands through expanded automated test coverage.
+* Removed an unused CLI tool and its associated parameter to simplify the interface and avoid confusion.
+* Added validation for tool configuration properties, returning clear errors when required values are missing or invalid.
+
 ## 0.1.0
 
 ### Features

@@ -19,6 +19,8 @@ package swmcp
 
 import (
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/mark3labs/mcp-go/server"
 	log "github.com/sirupsen/logrus"
@@ -48,21 +50,39 @@ func NewStreamable() *cobra.Command {
 		"The host and port to start the Streamable server on")
 	streamableCmd.Flags().String("endpoint-path", "/mcp",
 		"The path for the streamable-http server")
+	streamableCmd.Flags().String("allowed-origins", "",
+		"Comma-separated allowed CORS origins. Empty = open (any origin reflected). Use * for wildcard header.")
 	_ = viper.BindPFlag("address", streamableCmd.Flags().Lookup("address"))
 	_ = viper.BindPFlag("endpoint-path", streamableCmd.Flags().Lookup("endpoint-path"))
+	_ = viper.BindPFlag("allowed-origins", streamableCmd.Flags().Lookup("allowed-origins"))
 
 	return streamableCmd
 }
 
 // runStreamableServer starts the Streamable server with the provided configuration.
 func runStreamableServer(cfg *config.StreamableServerConfig) error {
+	allowedOrigins := parseAllowedOrigins(viper.GetString("allowed-origins"))
+
+	// httpServer is assigned after NewStreamableHTTPServer so the CORS handler
+	// closure can forward to it via the captured pointer variable.
+	var httpServerRef *server.StreamableHTTPServer
+	customSrv := &http.Server{
+		Handler: corsMiddleware(allowedOrigins, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			httpServerRef.ServeHTTP(w, r)
+		})),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
 	httpServer := server.NewStreamableHTTPServer(
 		newMCPServer(),
 		server.WithStateLess(true),
 		server.WithLogger(log.StandardLogger()),
 		server.WithHTTPContextFunc(EnhanceHTTPContextFunc()),
 		server.WithEndpointPath(viper.GetString("endpoint-path")),
+		server.WithStreamableHTTPServer(customSrv),
 	)
+	httpServerRef = httpServer
+
 	log.Infof("streamable HTTP server listening on %s%s\n", cfg.Address, cfg.EndpointPath)
 
 	if err := httpServer.Start(cfg.Address); err != nil {
