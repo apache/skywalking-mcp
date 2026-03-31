@@ -551,7 +551,7 @@ const maxRegexNodes = 50
 func validateRegexComplexity(pattern string) error {
 	re, err := syntax.Parse(pattern, syntax.Perl)
 	if err != nil {
-		return fmt.Errorf("regex is invalid")
+		return fmt.Errorf("regex is invalid: %w", err)
 	}
 	if regexNodeCount(re) > maxRegexNodes {
 		return fmt.Errorf("regex is too complex")
