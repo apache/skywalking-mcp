@@ -41,12 +41,11 @@ Unit tests exist for selected transport/context behavior. CI runs license checks
 Three MCP transport modes as cobra subcommands: `stdio`, `sse`, `streamable`.
 
 The SkyWalking OAP URL is resolved in priority order:
-- **stdio**: `set_skywalking_url` session tool > `--sw-url` flag > `http://localhost:12800/graphql`
-- **SSE/HTTP**: `--sw-url` flag > `http://localhost:12800/graphql`
+- **All transports**: `--sw-url` flag > `http://localhost:12800/graphql`
 
-The `set_skywalking_url` tool is only available in stdio mode (single client, well-defined session). SSE and HTTP transports always use the configured server URL.
+SSE and HTTP transports always use the configured server URL.
 
-Basic auth is configured via `--sw-username` / `--sw-password` flags. Both flags (and the `set_skywalking_url` tool) support `${ENV_VAR}` syntax to resolve credentials from environment variables (e.g. `--sw-password ${MY_SECRET}`).
+Basic auth is configured via `--sw-username` / `--sw-password` flags. The startup flags support `${ENV_VAR}` syntax to resolve credentials from environment variables (e.g. `--sw-password ${MY_SECRET}`).
 
 Each transport injects the OAP URL and auth into the request context via `WithSkyWalkingURLAndInsecure()` and `WithSkyWalkingAuth()`. Tools extract them downstream using `skywalking-cli`'s `contextkey.BaseURL{}`, `contextkey.Username{}`, and `contextkey.Password{}`.
 

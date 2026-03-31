@@ -32,35 +32,8 @@ import (
 // layer below. If mcp-go changes its internal field layout, update only the
 // helpers in this file rather than spreading reflect/unsafe access across tests.
 
-func TestNewMCPServerRegistersExpectedToolsForStdio(t *testing.T) {
-	srv := newMCPServer(true)
-
-	got := sortedToolNames(srv)
-	want := []string{
-		"execute_mqe_expression",
-		"get_mqe_metric_type",
-		"list_endpoints",
-		"list_instances",
-		"list_layers",
-		"list_mqe_metrics",
-		"list_processes",
-		"list_services",
-		"query_alarms",
-		"query_endpoints_topology",
-		"query_events",
-		"query_instances_topology",
-		"query_logs",
-		"query_processes_topology",
-		"query_services_topology",
-		"query_traces",
-		"set_skywalking_url",
-	}
-
-	assertStringSlicesEqual(t, got, want)
-}
-
-func TestNewMCPServerDoesNotRegisterSessionToolForNetworkTransports(t *testing.T) {
-	srv := newMCPServer(false)
+func TestNewMCPServerRegistersExpectedTools(t *testing.T) {
+	srv := newMCPServer()
 
 	got := sortedToolNames(srv)
 	want := []string{
@@ -86,7 +59,7 @@ func TestNewMCPServerDoesNotRegisterSessionToolForNetworkTransports(t *testing.T
 }
 
 func TestNewMCPServerRegistersExpectedPrompts(t *testing.T) {
-	srv := newMCPServer(false)
+	srv := newMCPServer()
 
 	got := sortedPromptNames(srv)
 	want := []string{
@@ -106,7 +79,7 @@ func TestNewMCPServerRegistersExpectedPrompts(t *testing.T) {
 }
 
 func TestNewMCPServerRegistersExpectedResources(t *testing.T) {
-	srv := newMCPServer(false)
+	srv := newMCPServer()
 
 	resources := resourceMap(srv)
 	got := make([]string, 0, len(resources))
@@ -126,7 +99,7 @@ func TestNewMCPServerRegistersExpectedResources(t *testing.T) {
 }
 
 func TestPromptMetadataIncludesExpectedArguments(t *testing.T) {
-	srv := newMCPServer(false)
+	srv := newMCPServer()
 	prompts := promptMap(srv)
 
 	prompt, ok := prompts["generate_duration"]
@@ -156,7 +129,7 @@ func TestPromptMetadataIncludesExpectedArguments(t *testing.T) {
 }
 
 func TestResourceMetadataIncludesExpectedMIMETypes(t *testing.T) {
-	srv := newMCPServer(false)
+	srv := newMCPServer()
 	resources := resourceMap(srv)
 
 	tests := []struct {
@@ -187,7 +160,7 @@ func TestResourceMetadataIncludesExpectedMIMETypes(t *testing.T) {
 }
 
 func TestToolMetadataIncludesExpectedDescriptionsAndSchemas(t *testing.T) {
-	srv := newMCPServer(true)
+	srv := newMCPServer()
 	tools := toolMap(srv)
 
 	tests := []struct {
@@ -195,7 +168,6 @@ func TestToolMetadataIncludesExpectedDescriptionsAndSchemas(t *testing.T) {
 		expectDesc       bool
 		expectProperties []string
 	}{
-		{name: "set_skywalking_url", expectDesc: true, expectProperties: []string{"url", "username", "password"}},
 		{name: "query_traces", expectDesc: true, expectProperties: []string{"service_id", "trace_id", "view"}},
 		{name: "execute_mqe_expression", expectDesc: true, expectProperties: []string{"expression", "service_name", "debug"}},
 	}

@@ -60,7 +60,7 @@ func runStdioServer(ctx context.Context, cfg *config.StdioServerConfig) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	stdioServer := server.NewStdioServer(newMCPServer(true))
+	stdioServer := server.NewStdioServer(newMCPServer())
 
 	logger, err := initLogger(cfg.LogFilePath)
 	if err != nil {

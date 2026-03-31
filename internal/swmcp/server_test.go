@@ -30,7 +30,6 @@ import (
 const (
 	configuredHTTPOAPURL  = "http://configured-oap:12800/graphql"
 	configuredHTTPSOAPURL = "https://configured-oap.example.com/graphql"
-	sessionOAPURL         = "http://session-oap:12800/graphql"
 )
 
 func TestConfiguredSkyWalkingURLUsesDefaultWhenUnset(t *testing.T) {
@@ -110,62 +109,6 @@ func TestWithConfiguredAuthSkipsEmptyUsername(t *testing.T) {
 	}
 }
 
-func TestApplySessionOverridesWithoutSessionLeavesContextUnchanged(t *testing.T) {
-	ctx := WithSkyWalkingURLAndInsecure(context.Background(), configuredHTTPOAPURL, false)
-
-	got := applySessionOverrides(ctx)
-	if gotURL, _ := got.Value(contextkey.BaseURL{}).(string); gotURL != configuredHTTPOAPURL {
-		t.Fatalf("base URL = %q", gotURL)
-	}
-}
-
-func TestApplySessionOverridesWithURLOnlyKeepsConfiguredAuth(t *testing.T) {
-	ctx := WithSkyWalkingURLAndInsecure(context.Background(), configuredHTTPOAPURL, false)
-	ctx = WithSkyWalkingAuth(ctx, "configured-user", "configured-pass")
-
-	session := &Session{}
-	session.SetConnection(sessionOAPURL, "", "")
-	ctx = WithSession(ctx, session)
-
-	got := applySessionOverrides(ctx)
-
-	gotURL, _ := got.Value(contextkey.BaseURL{}).(string)
-	if gotURL != sessionOAPURL {
-		t.Fatalf("base URL = %q", gotURL)
-	}
-
-	gotUser, _ := got.Value(contextkey.Username{}).(string)
-	if gotUser != "configured-user" {
-		t.Fatalf("username = %q", gotUser)
-	}
-
-	gotPass, _ := got.Value(contextkey.Password{}).(string)
-	if gotPass != "configured-pass" {
-		t.Fatalf("password = %q", gotPass)
-	}
-}
-
-func TestEnhanceStdioContextFuncStillAllowsSessionOverride(t *testing.T) {
-	t.Cleanup(viper.Reset)
-	viper.Set("url", "http://configured-oap:12800")
-
-	session := &Session{}
-	session.SetConnection(sessionOAPURL, "user", "pass")
-
-	ctx := WithSession(context.Background(), session)
-	ctx = applySessionOverrides(WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false))
-
-	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
-	if gotURL != sessionOAPURL {
-		t.Fatalf("base URL = %q", gotURL)
-	}
-
-	gotUser, _ := ctx.Value(contextkey.Username{}).(string)
-	if gotUser != "user" {
-		t.Fatalf("username = %q", gotUser)
-	}
-}
-
 func TestEnhanceStdioContextFuncUsesConfiguredURLAndAuth(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	t.Setenv("SW_STDIO_PASS", "stdio-pass")
@@ -188,10 +131,6 @@ func TestEnhanceStdioContextFuncUsesConfiguredURLAndAuth(t *testing.T) {
 	gotPass, _ := ctx.Value(contextkey.Password{}).(string)
 	if gotPass != "stdio-pass" {
 		t.Fatalf("password = %q", gotPass)
-	}
-
-	if _, ok := ctx.Value(sessionKey{}).(*Session); !ok {
-		t.Fatal("session not attached to stdio context")
 	}
 }
 

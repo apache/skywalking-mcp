@@ -37,18 +37,13 @@ import (
 )
 
 // newMCPServer creates a new MCP server with all tools, resources, and prompts registered.
-// When stdio is true, session management tools (set_skywalking_url) are also registered,
-// since stdio has a single client and session semantics are well-defined.
-func newMCPServer(stdio bool) *server.MCPServer {
+func newMCPServer() *server.MCPServer {
 	s := server.NewMCPServer(
 		"skywalking-mcp", "0.1.0",
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithLogging(),
 	)
-	if stdio {
-		AddSessionTools(s)
-	}
 	tools.AddTraceTools(s)
 	tools.AddLogTools(s)
 	tools.AddMQETools(s)
@@ -131,31 +126,12 @@ func withConfiguredAuth(ctx context.Context) context.Context {
 	return ctx
 }
 
-// applySessionOverrides checks for a session in the context and applies any
-// URL or auth overrides that were set via the set_skywalking_url tool.
-func applySessionOverrides(ctx context.Context) context.Context {
-	session := SessionFromContext(ctx)
-	if session == nil {
-		return ctx
-	}
-	if url := session.URL(); url != "" {
-		ctx = context.WithValue(ctx, contextkey.BaseURL{}, url)
-	}
-	if username := session.Username(); username != "" {
-		ctx = WithSkyWalkingAuth(ctx, username, session.Password())
-	}
-	return ctx
-}
-
 // EnhanceStdioContextFunc returns a StdioContextFunc that enriches the context
-// with SkyWalking settings from the global configuration and a per-session store.
+// with SkyWalking settings from the global configuration.
 func EnhanceStdioContextFunc() server.StdioContextFunc {
-	session := &Session{}
 	return func(ctx context.Context) context.Context {
-		ctx = WithSession(ctx, session)
 		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
 		ctx = withConfiguredAuth(ctx)
-		ctx = applySessionOverrides(ctx)
 		return ctx
 	}
 }
