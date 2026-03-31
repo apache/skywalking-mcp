@@ -123,10 +123,8 @@ func executeGraphQLWithContext(ctx context.Context, query string, variables map[
 	}
 
 	insecure := getContextBool(ctx, contextkey.Insecure{})
-	//nolint:gosec // InsecureSkipVerify is intentional and controlled by the --sw-insecure operator flag
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecure} //nolint:gosec // controlled by --sw-insecure operator flag
 	client := &http.Client{Transport: transport, Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {

@@ -51,7 +51,7 @@ func NewStreamable() *cobra.Command {
 	streamableCmd.Flags().String("endpoint-path", "/mcp",
 		"The path for the streamable-http server")
 	streamableCmd.Flags().String("allowed-origins", "",
-		"Comma-separated list of allowed CORS origins (e.g. http://localhost:3000,https://app.example.com). Empty allows all.")
+		"Comma-separated allowed CORS origins. Empty = open (any origin reflected). Use * for wildcard header.")
 	_ = viper.BindPFlag("address", streamableCmd.Flags().Lookup("address"))
 	_ = viper.BindPFlag("endpoint-path", streamableCmd.Flags().Lookup("endpoint-path"))
 	_ = viper.BindPFlag("allowed-origins", streamableCmd.Flags().Lookup("allowed-origins"))

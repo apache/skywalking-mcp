@@ -56,7 +56,7 @@ func NewSSEServer() *cobra.Command {
 	sseCmd.Flags().String("base-path", "",
 		"Base path for the sse server")
 	sseCmd.Flags().String("allowed-origins", "",
-		"Comma-separated list of allowed CORS origins (e.g. http://localhost:3000,https://app.example.com). Empty allows all.")
+		"Comma-separated allowed CORS origins. Empty = open (any origin reflected). Use * for wildcard header.")
 	_ = viper.BindPFlag("sse-address", sseCmd.Flags().Lookup("sse-address"))
 	_ = viper.BindPFlag("base-path", sseCmd.Flags().Lookup("base-path"))
 	_ = viper.BindPFlag("allowed-origins", sseCmd.Flags().Lookup("allowed-origins"))

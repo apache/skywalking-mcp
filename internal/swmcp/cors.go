@@ -23,19 +23,21 @@ import (
 )
 
 // corsMiddleware adds CORS response headers and enforces origin validation.
-// When allowedOrigins is empty, all origins are permitted (no restriction).
-// When populated, only listed origins receive CORS headers; requests from
-// any other origin with an Origin header receive 403 Forbidden.
+// When allowedOrigins is empty, every request with an Origin header is
+// reflected back — i.e., CORS is open and all browser origins work.
+// When allowedOrigins is non-empty, only listed origins receive CORS headers;
+// requests from any other origin receive 403 Forbidden. Use "*" as an entry
+// to explicitly allow all origins via the wildcard header.
 func corsMiddleware(allowedOrigins []string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
-			if isOriginAllowed(origin, allowedOrigins) {
+			if len(allowedOrigins) == 0 || isOriginAllowed(origin, allowedOrigins) {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
 				w.Header().Set("Vary", "Origin")
-			} else if len(allowedOrigins) > 0 {
+			} else {
 				http.Error(w, "forbidden: origin not allowed", http.StatusForbidden)
 				return
 			}

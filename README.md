@@ -50,12 +50,12 @@ Global Flags:
 SSE-specific Flags:
       --sse-address string     Host and port for the SSE server (default "localhost:8000")
       --base-path string       Base path for the SSE server
-      --allowed-origins string Comma-separated list of allowed CORS origins. Empty permits all.
+      --allowed-origins string Comma-separated list of allowed CORS origins. Empty reflects any origin (open CORS). Use * to send the wildcard header.
 
 Streamable-specific Flags:
       --address string         Host and port for the Streamable HTTP server (default "localhost:8000")
       --endpoint-path string   Endpoint path for the Streamable HTTP server (default "/mcp")
-      --allowed-origins string Comma-separated list of allowed CORS origins. Empty permits all.
+      --allowed-origins string Comma-separated list of allowed CORS origins. Empty reflects any origin (open CORS). Use * to send the wildcard header.
 
 Use "swmcp [command] --help" for more information about a command.
 ```
