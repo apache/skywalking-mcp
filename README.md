@@ -44,6 +44,7 @@ Flags:
       --sw-url string        Specify the OAP URL to connect to (e.g. http://localhost:12800)
       --sw-username string   Username for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)
       --sw-password string   Password for basic auth to SkyWalking OAP (supports ${ENV_VAR} syntax)
+      --sw-insecure          Skip TLS certificate verification for OAP connections (use only in development)
   -v, --version              version for swmcp
 
 Use "swmcp [command] --help" for more information about a command.
@@ -60,6 +61,9 @@ bin/swmcp stdio --sw-url http://localhost:12800 --sw-username admin --sw-passwor
 
 # with basic auth (password from environment variable)
 bin/swmcp stdio --sw-url http://localhost:12800 --sw-username admin --sw-password '${SW_PASSWORD}'
+
+# skip TLS verification (development only, e.g. self-signed certs)
+bin/swmcp stdio --sw-url https://localhost:12800 --sw-insecure
 
 # or use SSE server
 bin/swmcp sse --sse-address localhost:8000 --base-path /mcp --sw-url http://localhost:12800

@@ -20,6 +20,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,18 @@ func FinalizeURL(urlStr string) string {
 		urlStr = strings.TrimRight(urlStr, "/") + "/graphql"
 	}
 	return urlStr
+}
+
+// validateURLScheme ensures the URL uses http or https.
+func validateURLScheme(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid OAP URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported OAP URL scheme %q: only http and https are allowed", u.Scheme)
+	}
+	return nil
 }
 
 // FormatTimeByStep formats time according to step granularity

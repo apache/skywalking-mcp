@@ -107,7 +107,12 @@ func resolveEnvVar(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if strings.HasPrefix(trimmed, "${") && strings.HasSuffix(trimmed, "}") {
 		envName := trimmed[2 : len(trimmed)-1]
-		return os.Getenv(envName)
+		resolved, ok := os.LookupEnv(envName)
+		if !ok {
+			logrus.Warnf("environment variable %q is referenced but not set", envName)
+			return ""
+		}
+		return resolved
 	}
 	return value
 }
@@ -130,7 +135,7 @@ func withConfiguredAuth(ctx context.Context) context.Context {
 // with SkyWalking settings from the global configuration.
 func EnhanceStdioContextFunc() server.StdioContextFunc {
 	return func(ctx context.Context) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
+		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
 		ctx = withConfiguredAuth(ctx)
 		return ctx
 	}
@@ -140,7 +145,7 @@ func EnhanceStdioContextFunc() server.StdioContextFunc {
 // with SkyWalking settings from the CLI configuration and configured auth.
 func EnhanceSSEContextFunc() server.SSEContextFunc {
 	return func(ctx context.Context, _ *http.Request) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
+		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
 		ctx = withConfiguredAuth(ctx)
 		return ctx
 	}
@@ -150,7 +155,7 @@ func EnhanceSSEContextFunc() server.SSEContextFunc {
 // with SkyWalking settings from the CLI configuration and configured auth.
 func EnhanceHTTPContextFunc() server.HTTPContextFunc {
 	return func(ctx context.Context, _ *http.Request) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), false)
+		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
 		ctx = withConfiguredAuth(ctx)
 		return ctx
 	}

@@ -2,6 +2,16 @@
 
 Release Notes.
 
+## Next
+
+### Security
+
+* TLS certificate verification is now enforced for OAP connections. Added `--sw-insecure` flag to opt out (development/self-signed certs only).
+* Sensitive fields (`authorization`, `password`, `token`, `secret`) are redacted in `--log-command` output.
+* Environment variable references (`${VAR}`) in `--sw-username`/`--sw-password` now log a warning when the variable is not set, preventing silent unauthenticated requests.
+* URL scheme validation rejects non-http/https OAP URLs.
+* Regex patterns supplied to `list_mqe_metrics` are validated for complexity before compilation.
+
 ## 0.1.0
 
 ### Features

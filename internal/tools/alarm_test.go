@@ -23,6 +23,11 @@ import (
 	api "skywalking.apache.org/repo/goapi/query"
 )
 
+const (
+	testTimeStart = "2026-03-31 1000"
+	testTimeEnd   = "2026-03-31 1200"
+)
+
 func TestBuildAlarmQueryCondition(t *testing.T) {
 	timeCtx := TimeContext{
 		NowUTC:   time.Date(2026, 3, 31, 12, 0, 0, 0, time.UTC),
@@ -53,10 +58,10 @@ func TestBuildAlarmQueryCondition(t *testing.T) {
 	if cond.Duration == nil {
 		t.Fatal("duration is nil")
 	}
-	if cond.Duration.Start != "2026-03-31 1000" {
+	if cond.Duration.Start != testTimeStart {
 		t.Fatalf("start = %q", cond.Duration.Start)
 	}
-	if cond.Duration.End != "2026-03-31 1200" {
+	if cond.Duration.End != testTimeEnd {
 		t.Fatalf("end = %q", cond.Duration.End)
 	}
 	if cond.Paging == nil || cond.Paging.PageNum == nil || *cond.Paging.PageNum != 2 {
@@ -93,7 +98,7 @@ func TestBuildAlarmQueryConditionDefaults(t *testing.T) {
 	if cond.Duration == nil {
 		t.Fatal("duration is nil")
 	}
-	if cond.Duration.End != "2026-03-31 1200" {
+	if cond.Duration.End != testTimeEnd {
 		t.Fatalf("end = %q", cond.Duration.End)
 	}
 }

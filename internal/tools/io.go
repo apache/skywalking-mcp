@@ -19,9 +19,18 @@ package tools
 
 import (
 	"io"
+	"regexp"
 
 	log "github.com/sirupsen/logrus"
 )
+
+// sensitiveFieldPattern matches JSON fields whose values should be redacted in logs.
+var sensitiveFieldPattern = regexp.MustCompile(`(?i)("(?:authorization|password|token|secret)"\s*:\s*")((?:[^"\\]|\\.)*)(")`) //nolint:lll // regex must be on one line
+
+// redactSensitiveData masks values of sensitive JSON fields before logging.
+func redactSensitiveData(data string) string {
+	return sensitiveFieldPattern.ReplaceAllString(data, `${1}[REDACTED]${3}`)
+}
 
 // IOLogger is a wrapper around io.Reader and io.Writer that can be used
 // to log the data being read and written from the underlying streams
@@ -47,7 +56,7 @@ func (l *IOLogger) Read(p []byte) (n int, err error) {
 	}
 	n, err = l.reader.Read(p)
 	if n > 0 {
-		l.logger.Infof("[stdin]: received %d bytes: %s", n, string(p[:n]))
+		l.logger.Infof("[stdin]: received %d bytes: %s", n, redactSensitiveData(string(p[:n])))
 	}
 	return n, err
 }
@@ -57,6 +66,6 @@ func (l *IOLogger) Write(p []byte) (n int, err error) {
 	if l.writer == nil {
 		return 0, io.ErrClosedPipe
 	}
-	l.logger.Infof("[stdout]: sending %d bytes: %s", len(p), string(p))
+	l.logger.Infof("[stdout]: sending %d bytes: %s", len(p), redactSensitiveData(string(p)))
 	return l.writer.Write(p)
 }

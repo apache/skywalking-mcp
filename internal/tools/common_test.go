@@ -64,10 +64,10 @@ func TestParseDurationWithContextRelativeDuration(t *testing.T) {
 
 	got := ParseDurationWithContext("-2h", false, timeCtx)
 
-	if got.Start != "2026-03-31 1000" {
+	if got.Start != testTimeStart {
 		t.Fatalf("start = %q", got.Start)
 	}
-	if got.End != "2026-03-31 1200" {
+	if got.End != testTimeEnd {
 		t.Fatalf("end = %q", got.End)
 	}
 	if got.Step != api.StepMinute {
@@ -121,10 +121,10 @@ func TestBuildDurationWithContextParsesAbsoluteTimes(t *testing.T) {
 
 	got := BuildDurationWithContext("2026-03-31 18:00:00", "2026-03-31 20:00:00", "", false, 30, timeCtx)
 
-	if got.Start != "2026-03-31 1000" {
+	if got.Start != testTimeStart {
 		t.Fatalf("start = %q", got.Start)
 	}
-	if got.End != "2026-03-31 1200" {
+	if got.End != testTimeEnd {
 		t.Fatalf("end = %q", got.End)
 	}
 	if got.Step != api.StepMinute {
