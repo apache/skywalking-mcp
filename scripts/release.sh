@@ -65,8 +65,22 @@ resolve_release_version() {
     echo "dev-unknown"
 }
 
+resolve_release_commit() {
+    if [ -n "${RELEASE_GIT_COMMIT:-}" ]; then
+        git -C "${ROOTDIR}" rev-parse "${RELEASE_GIT_COMMIT}"
+        return 0
+    fi
+
+    if git -C "${ROOTDIR}" show-ref --tags --verify "refs/tags/v${RELEASE_VERSION}" >/dev/null 2>&1; then
+        git -C "${ROOTDIR}" rev-list -n 1 "v${RELEASE_VERSION}"
+        return 0
+    fi
+
+    git -C "${ROOTDIR}" rev-parse HEAD
+}
+
 RELEASE_VERSION=$(resolve_release_version)
-RELEASE_GIT_COMMIT=$(git -C "${ROOTDIR}" rev-parse HEAD)
+RELEASE_GIT_COMMIT=$(resolve_release_commit)
 
 SOURCE_FILE_NAME=skywalking-mcp-${RELEASE_VERSION}-src.tgz
 SOURCE_FILE=${BUILDDIR}/${SOURCE_FILE_NAME}
@@ -109,7 +123,7 @@ source(){
 
         rm -rf "${SOURCE_FILE}"
         mkdir -p "${srcdir}"
-        git -C "${ROOTDIR}" archive --format=tar HEAD | tar -xf - -C "${srcdir}"
+        git -C "${ROOTDIR}" archive --format=tar "${RELEASE_GIT_COMMIT}" | tar -xf - -C "${srcdir}"
         echo "RELEASE_VERSION=${RELEASE_VERSION}" > "${srcdir}/.env"
         tar -czf "${tmpdir}/${SOURCE_FILE_NAME}" -C "${srcdir}" .
 
@@ -141,7 +155,7 @@ parseCmdLine(){
             b) binary ;;
             s) source ;;
             k) sign "${OPTARG}" ;;
-            v) echo "Resolved RELEASE_VERSION=${RELEASE_VERSION}" ;;
+            v) echo "Resolved RELEASE_VERSION=${RELEASE_VERSION}" && echo "Resolved RELEASE_GIT_COMMIT=${RELEASE_GIT_COMMIT}" ;;
             h) usage ;;
             \?) usage ;;
         esac
