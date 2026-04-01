@@ -53,6 +53,16 @@ func TestConfiguredSkyWalkingURLFinalizesConfiguredValue(t *testing.T) {
 	}
 }
 
+func TestConfiguredSkyWalkingURLFallsBackToDefaultOnInvalidValue(t *testing.T) {
+	t.Cleanup(viper.Reset)
+	viper.Set("url", "ftp://configured-oap.example.com:12800")
+
+	got := configuredSkyWalkingURL()
+	if got != config.DefaultSWURL {
+		t.Fatalf("configuredSkyWalkingURL() = %q, want %q", got, config.DefaultSWURL)
+	}
+}
+
 func TestValidateConfiguredSkyWalkingURLRejectsUnsupportedScheme(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	viper.Set("url", "ftp://configured-oap.example.com:12800")

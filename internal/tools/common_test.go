@@ -40,6 +40,7 @@ func TestFinalizeURL(t *testing.T) {
 		{name: "adds graphql suffix", in: "http://localhost:12800", want: "http://localhost:12800/graphql"},
 		{name: "trims trailing slash", in: "http://localhost:12800/", want: "http://localhost:12800/graphql"},
 		{name: "keeps existing graphql", in: "http://localhost:12800/graphql", want: "http://localhost:12800/graphql"},
+		{name: "preserves query string", in: "http://localhost:12800?x=1", want: "http://localhost:12800/graphql?x=1"},
 	}
 
 	for _, tc := range tests {
@@ -60,7 +61,10 @@ func TestNormalizeOAPURL(t *testing.T) {
 	}{
 		{name: "http", in: "http://localhost:12800", want: "http://localhost:12800/graphql"},
 		{name: "https", in: "https://localhost:12800/graphql", want: "https://localhost:12800/graphql"},
+		{name: "preserves query and fragment", in: "https://localhost:12800/oap?debug=1#frag", want: "https://localhost:12800/oap/graphql?debug=1#frag"},
 		{name: "rejects unsupported scheme", in: "ftp://localhost:12800", wantErr: "unsupported OAP URL scheme \"ftp\""},
+		{name: "rejects missing host", in: "http://", wantErr: "host is required"},
+		{name: "rejects malformed hostless path", in: "http:/foo", wantErr: "host is required"},
 	}
 
 	for _, tc := range tests {

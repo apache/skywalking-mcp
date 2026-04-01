@@ -93,24 +93,24 @@ func WithSkyWalkingAuth(ctx context.Context, username, password string) context.
 // The value is sourced from the CLI/config binding for `--sw-url`,
 // falling back to the built-in default when unset.
 func configuredSkyWalkingURL() string {
+	resolvedURL, err := resolvedConfiguredSkyWalkingURL()
+	if err != nil {
+		logrus.WithError(err).Warn("invalid SkyWalking OAP URL configuration; falling back to default URL")
+		return config.DefaultSWURL
+	}
+	return resolvedURL
+}
+
+func resolvedConfiguredSkyWalkingURL() (string, error) {
 	urlStr := viper.GetString("url")
 	if urlStr == "" {
 		urlStr = config.DefaultSWURL
 	}
-	normalizedURL, err := tools.NormalizeOAPURL(urlStr)
-	if err != nil {
-		return tools.FinalizeURL(urlStr)
-	}
-	return normalizedURL
+	return tools.NormalizeOAPURL(urlStr)
 }
 
 func validateConfiguredSkyWalkingURL() error {
-	urlStr := viper.GetString("url")
-	if urlStr == "" {
-		urlStr = config.DefaultSWURL
-	}
-
-	_, err := tools.NormalizeOAPURL(urlStr)
+	_, err := resolvedConfiguredSkyWalkingURL()
 	return err
 }
 
