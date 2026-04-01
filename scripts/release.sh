@@ -30,6 +30,20 @@ require_cmd() {
     fi
 }
 
+has_git_worktree() {
+    command -v git >/dev/null 2>&1 && git -C "${ROOTDIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+require_git_worktree() {
+    if ! has_git_worktree; then
+        cat <<EOF >&2
+Error: assembling the source package requires a functional Git worktree at ${ROOTDIR}.
+Run this command from a Git checkout, or reuse a previously generated source archive when building/signing without Git metadata.
+EOF
+        exit 1
+    fi
+}
+
 resolve_release_version() {
     # 1) Explicit environment override
     if [ -n "${RELEASE_VERSION:-}" ]; then
@@ -38,7 +52,7 @@ resolve_release_version() {
     fi
 
     # 2) Derive from Git tags when available
-    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if has_git_worktree; then
         if latest_tag=$(git describe --tags "$(git rev-list --tags --max-count=1)" 2>/dev/null); then
             echo "${latest_tag#v}"
             return 0
@@ -67,16 +81,21 @@ resolve_release_version() {
 
 resolve_release_commit() {
     if [ -n "${RELEASE_GIT_COMMIT:-}" ]; then
-        git -C "${ROOTDIR}" rev-parse "${RELEASE_GIT_COMMIT}"
+        echo "${RELEASE_GIT_COMMIT}"
         return 0
     fi
 
-    if git -C "${ROOTDIR}" show-ref --tags --verify "refs/tags/v${RELEASE_VERSION}" >/dev/null 2>&1; then
+    if has_git_worktree && git -C "${ROOTDIR}" show-ref --tags --verify "refs/tags/v${RELEASE_VERSION}" >/dev/null 2>&1; then
         git -C "${ROOTDIR}" rev-list -n 1 "v${RELEASE_VERSION}"
         return 0
     fi
 
-    git -C "${ROOTDIR}" rev-parse HEAD
+    if has_git_worktree; then
+        git -C "${ROOTDIR}" rev-parse HEAD
+        return 0
+    fi
+
+    echo "unknown"
 }
 
 RELEASE_VERSION=$(resolve_release_version)
@@ -114,6 +133,8 @@ binary(){
 
 source(){
     require_cmd tar
+    require_git_worktree
+    require_cmd git
 
     (
         tmpdir=$(mktemp -d)
@@ -181,8 +202,6 @@ EOF
 #
 # main
 #
-
-require_cmd git
 
 ret=0
 
