@@ -97,7 +97,21 @@ func configuredSkyWalkingURL() string {
 	if urlStr == "" {
 		urlStr = config.DefaultSWURL
 	}
-	return tools.FinalizeURL(urlStr)
+	normalizedURL, err := tools.NormalizeOAPURL(urlStr)
+	if err != nil {
+		return tools.FinalizeURL(urlStr)
+	}
+	return normalizedURL
+}
+
+func validateConfiguredSkyWalkingURL() error {
+	urlStr := viper.GetString("url")
+	if urlStr == "" {
+		urlStr = config.DefaultSWURL
+	}
+
+	_, err := tools.NormalizeOAPURL(urlStr)
+	return err
 }
 
 // resolveEnvVar resolves a value that may contain an environment variable reference

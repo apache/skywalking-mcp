@@ -51,6 +51,15 @@ func FinalizeURL(urlStr string) string {
 	return urlStr
 }
 
+// NormalizeOAPURL appends the GraphQL path when needed and rejects unsupported URL schemes.
+func NormalizeOAPURL(rawURL string) (string, error) {
+	finalizedURL := FinalizeURL(rawURL)
+	if err := validateURLScheme(finalizedURL); err != nil {
+		return "", err
+	}
+	return finalizedURL, nil
+}
+
 // validateURLScheme ensures the URL uses http or https.
 func validateURLScheme(rawURL string) error {
 	u, err := url.Parse(rawURL)

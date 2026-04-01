@@ -41,6 +41,10 @@ func NewSSEServer() *cobra.Command {
 		Short: "Start SSE server",
 		Long:  `Start a server that listens for Server-Sent Events (SSE) on the specified address.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			if err := validateConfiguredSkyWalkingURL(); err != nil {
+				return err
+			}
+
 			sseServerConfig := config.SSEServerConfig{
 				Address:  viper.GetString("sse-address"),
 				BasePath: viper.GetString("base-path"),

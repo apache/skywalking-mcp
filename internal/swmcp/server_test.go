@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/apache/skywalking-mcp/internal/config"
@@ -49,6 +50,33 @@ func TestConfiguredSkyWalkingURLFinalizesConfiguredValue(t *testing.T) {
 	want := "https://configured-oap.example.com:12800/graphql"
 	if got != want {
 		t.Fatalf("configuredSkyWalkingURL() = %q, want %q", got, want)
+	}
+}
+
+func TestValidateConfiguredSkyWalkingURLRejectsUnsupportedScheme(t *testing.T) {
+	t.Cleanup(viper.Reset)
+	viper.Set("url", "ftp://configured-oap.example.com:12800")
+
+	err := validateConfiguredSkyWalkingURL()
+	if err == nil {
+		t.Fatal("validateConfiguredSkyWalkingURL() error = nil, want error")
+	}
+}
+
+func TestTransportCommandsRejectInvalidSWURL(t *testing.T) {
+	t.Cleanup(viper.Reset)
+	viper.Set("url", "ftp://configured-oap.example.com:12800")
+
+	for name, cmd := range map[string]*cobra.Command{
+		"stdio":      NewStdioServer(),
+		"sse":        NewSSEServer(),
+		"streamable": NewStreamable(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := cmd.RunE(cmd, nil); err == nil {
+				t.Fatal("RunE() error = nil, want invalid sw-url error")
+			}
+		})
 	}
 }
 
