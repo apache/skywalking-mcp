@@ -73,8 +73,8 @@ make release-push-candidate
 ```
 
 This script:
-1. SVN-checks out `https://dist.apache.org/repos/dist/dev/skywalking/`
-2. Copies the tarballs, signature, and checksum into `skywalking/mcp/${VERSION}/`
+1. SVN-checks out `https://dist.apache.org/repos/dist/dev/skywalking/mcp/`
+2. Copies the tarballs, signature, and checksum into `mcp/${VERSION}/`
 3. Commits to SVN
 4. Prints a vote email template to stdout
 

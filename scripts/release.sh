@@ -66,6 +66,7 @@ resolve_release_version() {
 }
 
 RELEASE_VERSION=$(resolve_release_version)
+RELEASE_GIT_COMMIT=$(git -C "${ROOTDIR}" rev-parse HEAD)
 
 SOURCE_FILE_NAME=skywalking-mcp-${RELEASE_VERSION}-src.tgz
 SOURCE_FILE=${BUILDDIR}/${SOURCE_FILE_NAME}
@@ -84,7 +85,7 @@ binary(){
 
         tar -xvf "${SOURCE_FILE}" -C "${tmpdir}"
         cd "${tmpdir}"
-        make build
+        make build VERSION="${RELEASE_VERSION}" GIT_COMMIT="${RELEASE_GIT_COMMIT}"
 
         bindir=./build
         mkdir -p "${bindir}/bin"
@@ -104,19 +105,13 @@ source(){
         tmpdir=$(mktemp -d)
         trap 'rm -rf "${tmpdir}"' EXIT
 
+        srcdir="${tmpdir}/src"
+
         rm -rf "${SOURCE_FILE}"
-        cd "${ROOTDIR}"
-        echo "RELEASE_VERSION=${RELEASE_VERSION}" > .env
-        tar \
-        --exclude=".DS_Store" \
-        --exclude=".github" \
-        --exclude=".gitignore" \
-        --exclude=".asf.yaml" \
-        --exclude=".idea" \
-        --exclude=".vscode" \
-        --exclude="bin" \
-        -czf "${tmpdir}/${SOURCE_FILE_NAME}" \
-        .
+        mkdir -p "${srcdir}"
+        git -C "${ROOTDIR}" archive --format=tar HEAD | tar -xf - -C "${srcdir}"
+        echo "RELEASE_VERSION=${RELEASE_VERSION}" > "${srcdir}/.env"
+        tar -czf "${tmpdir}/${SOURCE_FILE_NAME}" -C "${srcdir}" .
 
         mkdir -p "${BUILDDIR}"
         mv "${tmpdir}/${SOURCE_FILE_NAME}" "${BUILDDIR}"
