@@ -36,6 +36,10 @@ func NewStreamable() *cobra.Command {
 		Short: "Start Streamable server",
 		Long:  `Starting SkyWalking MCP server with Streamable HTTP transport.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			if err := validateConfiguredSkyWalkingURL(); err != nil {
+				return err
+			}
+
 			streamableConfig := config.StreamableServerConfig{
 				Address:      viper.GetString("address"),
 				EndpointPath: viper.GetString("endpoint-path"),

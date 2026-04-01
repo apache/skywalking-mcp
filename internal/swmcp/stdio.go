@@ -41,6 +41,10 @@ func NewStdioServer() *cobra.Command {
 		Short: "Start stdio server",
 		Long:  `Start a server that communicates via standard input/output streams using JSON-RPC messages.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			if err := validateConfiguredSkyWalkingURL(); err != nil {
+				return err
+			}
+
 			stdioServerConfig := config.StdioServerConfig{
 				URL:         viper.GetString("url"),
 				ReadOnly:    viper.GetBool("read-only"),

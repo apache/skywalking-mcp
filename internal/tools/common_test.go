@@ -17,6 +17,7 @@
 package tools
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -39,12 +40,51 @@ func TestFinalizeURL(t *testing.T) {
 		{name: "adds graphql suffix", in: "http://localhost:12800", want: "http://localhost:12800/graphql"},
 		{name: "trims trailing slash", in: "http://localhost:12800/", want: "http://localhost:12800/graphql"},
 		{name: "keeps existing graphql", in: "http://localhost:12800/graphql", want: "http://localhost:12800/graphql"},
+		{name: "preserves query string", in: "http://localhost:12800?x=1", want: "http://localhost:12800/graphql?x=1"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := FinalizeURL(tc.in); got != tc.want {
 				t.Fatalf("FinalizeURL(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeOAPURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    string
+		wantErr string
+	}{
+		{name: "http", in: "http://localhost:12800", want: "http://localhost:12800/graphql"},
+		{name: "https", in: "https://localhost:12800/graphql", want: "https://localhost:12800/graphql"},
+		{name: "preserves query and fragment", in: "https://localhost:12800/oap?debug=1#frag", want: "https://localhost:12800/oap/graphql?debug=1#frag"},
+		{name: "rejects unsupported scheme", in: "ftp://localhost:12800", wantErr: "unsupported OAP URL scheme \"ftp\""},
+		{name: "rejects missing host", in: "http://", wantErr: "host is required"},
+		{name: "rejects malformed hostless path", in: "http:/foo", wantErr: "host is required"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := NormalizeOAPURL(tc.in)
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("NormalizeOAPURL(%q) error = nil, want %q", tc.in, tc.wantErr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("NormalizeOAPURL(%q) error = %q, want substring %q", tc.in, err.Error(), tc.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("NormalizeOAPURL(%q) unexpected error: %v", tc.in, err)
+			}
+			if got != tc.want {
+				t.Fatalf("NormalizeOAPURL(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
 	}

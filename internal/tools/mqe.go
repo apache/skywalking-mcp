@@ -91,9 +91,8 @@ func getContextBool(ctx context.Context, key any) bool {
 // executeGraphQLWithContext executes a GraphQL query using URL and auth from context.
 func executeGraphQLWithContext(ctx context.Context, query string, variables map[string]interface{}) (*GraphQLResponse, error) {
 	rawURL := getContextString(ctx, contextkey.BaseURL{})
-	rawURL = FinalizeURL(rawURL)
-
-	if err := validateURLScheme(rawURL); err != nil {
+	normalizedURL, err := NormalizeOAPURL(rawURL)
+	if err != nil {
 		return nil, err
 	}
 
@@ -107,7 +106,7 @@ func executeGraphQLWithContext(ctx context.Context, query string, variables map[
 		return nil, fmt.Errorf("failed to marshal GraphQL request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", rawURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", normalizedURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}

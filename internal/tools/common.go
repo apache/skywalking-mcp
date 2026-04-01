@@ -45,18 +45,37 @@ const (
 
 // FinalizeURL ensures the URL ends with "/graphql".
 func FinalizeURL(urlStr string) string {
-	if !strings.HasSuffix(urlStr, "/graphql") {
-		urlStr = strings.TrimRight(urlStr, "/") + "/graphql"
+	normalizedURL, err := NormalizeOAPURL(urlStr)
+	if err == nil {
+		return normalizedURL
 	}
 	return urlStr
 }
 
-// validateURLScheme ensures the URL uses http or https.
-func validateURLScheme(rawURL string) error {
+// NormalizeOAPURL parses and validates the OAP URL, then ensures the path ends with /graphql.
+func NormalizeOAPURL(rawURL string) (string, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return fmt.Errorf("invalid OAP URL: %w", err)
+		return "", fmt.Errorf("invalid OAP URL: %w", err)
 	}
+	if err := validateURLScheme(u); err != nil {
+		return "", err
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("invalid OAP URL %q: host is required", rawURL)
+	}
+
+	if u.Path == "" || u.Path == "/" {
+		u.Path = "/graphql"
+	} else if !strings.HasSuffix(u.Path, "/graphql") {
+		u.Path = strings.TrimRight(u.Path, "/") + "/graphql"
+	}
+
+	return u.String(), nil
+}
+
+// validateURLScheme ensures the URL uses http or https.
+func validateURLScheme(u *url.URL) error {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return fmt.Errorf("unsupported OAP URL scheme %q: only http and https are allowed", u.Scheme)
 	}
