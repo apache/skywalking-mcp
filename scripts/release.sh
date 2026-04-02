@@ -30,6 +30,20 @@ require_cmd() {
     fi
 }
 
+has_git_worktree() {
+    command -v git >/dev/null 2>&1 && git -C "${ROOTDIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+require_git_worktree() {
+    if ! has_git_worktree; then
+        cat <<EOF >&2
+Error: assembling the source package requires a functional Git worktree at ${ROOTDIR}.
+Run this command from a Git checkout, or reuse a previously generated source archive when building/signing without Git metadata.
+EOF
+        exit 1
+    fi
+}
+
 resolve_release_version() {
     # 1) Explicit environment override
     if [ -n "${RELEASE_VERSION:-}" ]; then
@@ -38,7 +52,7 @@ resolve_release_version() {
     fi
 
     # 2) Derive from Git tags when available
-    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if has_git_worktree; then
         if latest_tag=$(git describe --tags "$(git rev-list --tags --max-count=1)" 2>/dev/null); then
             echo "${latest_tag#v}"
             return 0
@@ -65,7 +79,27 @@ resolve_release_version() {
     echo "dev-unknown"
 }
 
+resolve_release_commit() {
+    if [ -n "${RELEASE_GIT_COMMIT:-}" ]; then
+        echo "${RELEASE_GIT_COMMIT}"
+        return 0
+    fi
+
+    if has_git_worktree && git -C "${ROOTDIR}" show-ref --tags --verify "refs/tags/v${RELEASE_VERSION}" >/dev/null 2>&1; then
+        git -C "${ROOTDIR}" rev-list -n 1 "v${RELEASE_VERSION}"
+        return 0
+    fi
+
+    if has_git_worktree; then
+        git -C "${ROOTDIR}" rev-parse HEAD
+        return 0
+    fi
+
+    echo "unknown"
+}
+
 RELEASE_VERSION=$(resolve_release_version)
+RELEASE_GIT_COMMIT=$(resolve_release_commit)
 
 SOURCE_FILE_NAME=skywalking-mcp-${RELEASE_VERSION}-src.tgz
 SOURCE_FILE=${BUILDDIR}/${SOURCE_FILE_NAME}
@@ -84,7 +118,7 @@ binary(){
 
         tar -xvf "${SOURCE_FILE}" -C "${tmpdir}"
         cd "${tmpdir}"
-        make build
+        make build VERSION="${RELEASE_VERSION}" GIT_COMMIT="${RELEASE_GIT_COMMIT}"
 
         bindir=./build
         mkdir -p "${bindir}/bin"
@@ -99,24 +133,20 @@ binary(){
 
 source(){
     require_cmd tar
+    require_git_worktree
+    require_cmd git
 
     (
         tmpdir=$(mktemp -d)
         trap 'rm -rf "${tmpdir}"' EXIT
 
+        srcdir="${tmpdir}/src"
+
         rm -rf "${SOURCE_FILE}"
-        cd "${ROOTDIR}"
-        echo "RELEASE_VERSION=${RELEASE_VERSION}" > .env
-        tar \
-        --exclude=".DS_Store" \
-        --exclude=".github" \
-        --exclude=".gitignore" \
-        --exclude=".asf.yaml" \
-        --exclude=".idea" \
-        --exclude=".vscode" \
-        --exclude="bin" \
-        -czf "${tmpdir}/${SOURCE_FILE_NAME}" \
-        .
+        mkdir -p "${srcdir}"
+        git -C "${ROOTDIR}" archive --format=tar "${RELEASE_GIT_COMMIT}" | tar -xf - -C "${srcdir}"
+        echo "RELEASE_VERSION=${RELEASE_VERSION}" > "${srcdir}/.env"
+        tar -czf "${tmpdir}/${SOURCE_FILE_NAME}" -C "${srcdir}" .
 
         mkdir -p "${BUILDDIR}"
         mv "${tmpdir}/${SOURCE_FILE_NAME}" "${BUILDDIR}"
@@ -146,7 +176,7 @@ parseCmdLine(){
             b) binary ;;
             s) source ;;
             k) sign "${OPTARG}" ;;
-            v) echo "Resolved RELEASE_VERSION=${RELEASE_VERSION}" ;;
+            v) echo "Resolved RELEASE_VERSION=${RELEASE_VERSION}" && echo "Resolved RELEASE_GIT_COMMIT=${RELEASE_GIT_COMMIT}" ;;
             h) usage ;;
             \?) usage ;;
         esac
@@ -172,8 +202,6 @@ EOF
 #
 # main
 #
-
-require_cmd git
 
 ret=0
 

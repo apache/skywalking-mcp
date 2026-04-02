@@ -43,7 +43,7 @@ git push origin v${VERSION}
 
 ## Step 3 — Build and sign the artifacts
 
-`release.sh` resolves the version from the **latest tag reachable in the repo** (via `git describe --tags`), not from the `VERSION` env var. To ensure the artifacts are stamped with the intended version, use one of these approaches:
+`release.sh` resolves the version from the **latest tag reachable in the repo** (via `git describe --tags`), not from the `VERSION` env var. It also resolves a single release commit and uses that same commit for both the source archive and the binary build. To ensure the artifacts are stamped with the intended version, use one of these approaches:
 
 **Option A (recommended): set `RELEASE_VERSION` explicitly**
 
@@ -56,6 +56,8 @@ RELEASE_VERSION=${VERSION} make release-assembly
 If `v${VERSION}` is already the most recent tag, `make release-assembly` picks it up automatically without any env override.
 
 > If another newer tag exists in the repo, Option A is required to avoid building artifacts with the wrong version.
+
+By default, the release commit is resolved from tag `v${VERSION}` when it exists. You can override it explicitly with `RELEASE_GIT_COMMIT=<commit>` when you need to release from a specific commit.
 
 This runs three steps in sequence:
 1. `release-source` — creates `build/skywalking-mcp-${VERSION}-src.tgz`
@@ -73,8 +75,8 @@ make release-push-candidate
 ```
 
 This script:
-1. SVN-checks out `https://dist.apache.org/repos/dist/dev/skywalking/`
-2. Copies the tarballs, signature, and checksum into `skywalking/mcp/${VERSION}/`
+1. SVN-checks out `https://dist.apache.org/repos/dist/dev/skywalking/mcp/`
+2. Copies the tarballs, signature, and checksum into `mcp/${VERSION}/`
 3. Commits to SVN
 4. Prints a vote email template to stdout
 

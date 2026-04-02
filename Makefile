@@ -16,8 +16,9 @@
 #
 
 VERSION_PATH=main
-VERSION ?= dev-$(shell git rev-parse --short HEAD)
-GIT_COMMIT=$(shell git rev-parse HEAD)
+-include .env
+VERSION ?= $(if $(RELEASE_VERSION),$(RELEASE_VERSION),dev-$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown))
+GIT_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
 BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 MKDIR_P = mkdir -p
 

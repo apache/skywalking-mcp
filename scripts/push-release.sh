@@ -43,21 +43,21 @@ RELEASE_COMMIT=$(git -C "${ROOTDIR}" rev-list -n 1 "${TAG_NAME}")
 pushd ${BUILDDIR}
 trap 'popd' EXIT
 
-rm -rf skywalking
+rm -rf mcp
 
-svn co https://dist.apache.org/repos/dist/dev/skywalking/
-mkdir -p skywalking/mcp/"$VERSION"
+svn co https://dist.apache.org/repos/dist/dev/skywalking/mcp/
+mkdir -p mcp/"$VERSION"
 BINARY_TGZ="${PRODUCT_NAME}.tgz"
 SRC_TGZ="${PRODUCT_NAME}-src.tgz"
-cp "${BINARY_TGZ}" skywalking/mcp/"$VERSION"
-cp "${BINARY_TGZ}.asc" skywalking/mcp/"$VERSION"
-cp "${BINARY_TGZ}.sha512" skywalking/mcp/"$VERSION"
-cp "${SRC_TGZ}" skywalking/mcp/"$VERSION"
-cp "${SRC_TGZ}.asc" skywalking/mcp/"$VERSION"
-cp "${SRC_TGZ}.sha512" skywalking/mcp/"$VERSION"
+cp "${BINARY_TGZ}" mcp/"$VERSION"
+cp "${BINARY_TGZ}.asc" mcp/"$VERSION"
+cp "${BINARY_TGZ}.sha512" mcp/"$VERSION"
+cp "${SRC_TGZ}" mcp/"$VERSION"
+cp "${SRC_TGZ}.asc" mcp/"$VERSION"
+cp "${SRC_TGZ}.sha512" mcp/"$VERSION"
 
-cd skywalking && svn add --parents mcp/"$VERSION" && svn commit -m "Draft Apache SkyWalking MCP release $VERSION"
-cd mcp/"$VERSION"
+cd mcp && svn add --parents "$VERSION" && svn commit -m "Draft Apache SkyWalking MCP release $VERSION"
+cd "$VERSION"
 
 cat << EOF
 =========================================================================
