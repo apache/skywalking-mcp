@@ -101,6 +101,107 @@ func tracesV2(ctx context.Context, condition *api.TraceQueryCondition) (api.Trac
 	return response["result"], err
 }
 
+const hasQueryTracesV2SupportGQL = `
+query {
+	result: hasQueryTracesV2Support
+}`
+
+const queryBasicTracesV1GQL = `
+query ($condition: TraceQueryCondition!) {
+	result: queryBasicTraces(condition: $condition) {
+		traces { segmentId endpointNames duration start isError traceIds }
+	}
+}`
+
+// queryTraceV1GQL omits the queryTrace `duration` argument deliberately: it is BanyanDB-only
+// and absent on OAP < 10.3.0, so including it would break this fallback on older backends.
+const queryTraceV1GQL = `
+query ($traceId: ID!) {
+	result: queryTrace(traceId: $traceId) {
+		spans {
+			traceId segmentId spanId parentSpanId
+			refs { traceId parentSegmentId parentSpanId type }
+			serviceCode serviceInstanceName
+			startTime endTime endpointName type peer component isError layer
+			tags { key value }
+			logs { time data { key value } }
+			attachedEvents {
+				startTime { seconds nanos } event endTime { seconds nanos }
+				tags { key value } summary { key value }
+			}
+		}
+	}
+}`
+
+func queryTracesAuto(ctx context.Context, condition *api.TraceQueryCondition) (api.TraceList, error) {
+	if supportsTraceV2(ctx) {
+		return tracesV2(ctx, condition)
+	}
+	return tracesV1(ctx, condition)
+}
+
+// supportsTraceV2 treats any error (field absent on an older OAP, or an unreachable backend)
+// as "not supported" so the v1 path is used; a broken connection then surfaces on that query.
+func supportsTraceV2(ctx context.Context) bool {
+	var response map[string]bool
+	request := graphql.NewRequest(hasQueryTracesV2SupportGQL)
+	if err := client.ExecuteQuery(ctx, request, &response); err != nil {
+		return false
+	}
+	return response["result"]
+}
+
+func basicTracesV1(ctx context.Context, condition *api.TraceQueryCondition) (api.TraceBrief, error) {
+	var response map[string]api.TraceBrief
+	request := graphql.NewRequest(queryBasicTracesV1GQL)
+	request.Var("condition", condition)
+	err := client.ExecuteQuery(ctx, request, &response)
+	return response["result"], err
+}
+
+func traceV1(ctx context.Context, traceID string) (api.Trace, error) {
+	var response map[string]api.Trace
+	request := graphql.NewRequest(queryTraceV1GQL)
+	request.Var("traceId", traceID)
+	err := client.ExecuteQuery(ctx, request, &response)
+	return response["result"], err
+}
+
+// tracesV1 fetches each unique trace's spans via queryTrace because queryBasicTraces returns
+// summaries only. queryBasicTraces paginates over segments on non-BanyanDB storage, so
+// page_size bounds segments (not traces) and segments of one trace are de-duplicated here —
+// a broad query may return fewer than page_size traces (narrow by service/endpoint).
+func tracesV1(ctx context.Context, condition *api.TraceQueryCondition) (api.TraceList, error) {
+	brief, err := basicTracesV1(ctx, condition)
+	if err != nil {
+		return api.TraceList{}, err
+	}
+
+	traceList := api.TraceList{Traces: make([]*api.TraceV2, 0, len(brief.Traces))}
+	seen := make(map[string]struct{}, len(brief.Traces))
+	for _, basic := range brief.Traces {
+		if basic == nil || len(basic.TraceIds) == 0 {
+			continue
+		}
+		traceID := basic.TraceIds[0]
+		if _, ok := seen[traceID]; ok {
+			continue
+		}
+		seen[traceID] = struct{}{}
+
+		trace, err := traceV1(ctx, traceID)
+		if err != nil {
+			return api.TraceList{}, err
+		}
+		if len(trace.Spans) == 0 {
+			// Trace vanished between the two calls; skip so it is not counted as empty.
+			continue
+		}
+		traceList.Traces = append(traceList.Traces, &api.TraceV2{Spans: trace.Spans})
+	}
+	return traceList, nil
+}
+
 // Trace-specific constants
 const (
 	DefaultTracePageSize = 20
@@ -393,8 +494,10 @@ func searchTraces(ctx context.Context, req *TracesQueryRequest) (*mcp.CallToolRe
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	// Execute query using queryTraces (v2 protocol)
-	traceList, err := tracesV2(ctx, condition)
+	// Execute the query, automatically selecting the trace protocol supported by
+	// the backend storage: queryTraces (v2) for BanyanDB, or the legacy
+	// queryBasicTraces + queryTrace (v1) for Elasticsearch/JDBC and older OAP.
+	traceList, err := queryTracesAuto(ctx, condition)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf(ErrFailedToQueryTraces, err)), nil
 	}
@@ -608,6 +711,11 @@ Important Notes:
 - SkyWalking OAP requires either a time range or 'trace_id' to be specified
 - If no time range and no trace_id are provided, a default duration of "1h" (last 1 hour) will be used
 - This ensures the query always has a valid time range or specific trace to search
+- The trace query protocol is selected automatically based on the backend storage, so this
+  tool works with BanyanDB, Elasticsearch, and JDBC storages
+- On non-BanyanDB storages, page_size bounds trace segments rather than whole traces, so a
+  broad query may return fewer distinct traces than page_size; narrow it by service or
+  endpoint for more complete results
 
 View Options:
 - 'full': (Default) Complete raw data for detailed analysis

@@ -112,6 +112,18 @@ All `.go` files must have the Apache 2.0 license header (17-line block). Run `ma
 ### Error Handling in Tools
 Tool handlers should return `(mcp.NewToolResultError(...), nil)` for expected query failures (bad input, OAP errors), not `(nil, err)`. Reserve Go errors for truly unexpected failures. Use the `ErrMarshalFailed` constant for JSON marshal errors.
 
+### Comments
+Add a comment only when the code is not clear on its own — explain the non-obvious *why* (a workaround, a compatibility constraint, a surprising side effect), not the *what*. Do not write doc comments that merely restate a function/const name. Example worth keeping: `queryTraceV1GQL` omits the `duration` arg because it does not exist on OAP < 10.3.0.
+
 ## CI & Merge Policy
 
 Squash-merge only. PRs to `main` require 1 approval and passing `Required` status check (license + lint + docker build). Go 1.25.
+
+### GitHub Actions & the ASF allowed-actions list
+This repo is under `apache/*` and is governed by the ASF org-wide allowed-actions policy, enforced on every workflow run:
+- Actions in `apache/*`, `actions/*`, and `github/*` are always allowed — no pinning required.
+- Every **third-party** action (e.g. `docker/*`) must be pinned to a specific commit **SHA** that is on the ASF approved list. The list **rotates**: old SHAs are pruned as new action versions are approved, so a pin that passed months ago can later be rejected with "action is not allowed". `publish-docker.yaml` only runs on push-to-`main`/release, so a stale pin stays latent until the next publish.
+- Before relying on or bumping a third-party action, check the SHA against the approved list: https://github.com/apache/infrastructure-actions/blob/main/approved_patterns.yml (entries are `owner/action@<SHA>`; pick the newest approved SHA of that action). Only if a needed action/SHA is absent does it require a PR to `apache/infrastructure-actions`.
+
+### Commit authorship
+Commits produced with AI assistance credit the assistant as a co-author, e.g. a `Co-Authored-By: Claude <...>` trailer, so the contribution is attributed transparently.
