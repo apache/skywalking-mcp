@@ -22,7 +22,8 @@ GIT_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
 BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 MKDIR_P = mkdir -p
 
-GO_LINT = golangci-lint
+GO_BIN = $(shell go env GOPATH)/bin
+GO_LINT = $(GO_BIN)/golangci-lint
 LICENSE_EYE = license-eye
 
 HUB ?= ghcr.io/apache
@@ -59,15 +60,16 @@ test: ## Run unit tests.
 test-cover: ## Run unit tests with coverage output in coverage.txt.
 	go test $(GO_TEST_FLAGS) -coverprofile=coverage.txt $(GO_TEST_PKGS)
 
-$(GO_LINT):
-	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+.PHONY: install-lint
+install-lint:
+	@$(GO_LINT) version 2>/dev/null | grep -qE 'version v?2\.' || GOBIN=$(GO_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 $(LICENSE_EYE):
 	@$(LICENSE_EYE) --version > /dev/null 2>&1 || go install github.com/apache/skywalking-eyes/cmd/license-eye@latest
 
-lint: $(GO_LINT) ## Run linter.
+lint: install-lint ## Run linter.
 	$(GO_LINT) run -v --timeout 5m ./...
 
-fix-lint: $(GO_LINT) ## Auto-fix lint issues.
+fix-lint: install-lint ## Auto-fix lint issues.
 	$(GO_LINT) run -v --fix ./...
 
 .PHONY: license-header
