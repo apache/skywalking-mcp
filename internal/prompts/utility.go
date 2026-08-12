@@ -21,10 +21,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func generateDurationHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func generateDurationHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	timeRange := request.Params.Arguments["time_range"]
 
 	prompt := fmt.Sprintf(`Convert the following time range description into a duration object with "start" and "end" fields.
@@ -45,16 +45,16 @@ This duration can be passed directly to tools such as list_instances, list_endpo
 
 	return &mcp.GetPromptResult{
 		Description: "Generate a {start, end} duration object from a natural-language time range",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role:    mcp.RoleUser,
-				Content: mcp.TextContent{Type: "text", Text: prompt},
+				Role:    "user",
+				Content: &mcp.TextContent{Text: prompt},
 			},
 		},
 	}, nil
 }
 
-func exploreServiceTopologyHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func exploreServiceTopologyHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	layer := args["layer"]
 	start := args["start"]
@@ -105,11 +105,10 @@ func exploreServiceTopologyHandler(_ context.Context, request mcp.GetPromptReque
 
 	return &mcp.GetPromptResult{
 		Description: "Service topology exploration",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},
@@ -117,7 +116,7 @@ func exploreServiceTopologyHandler(_ context.Context, request mcp.GetPromptReque
 	}, nil
 }
 
-func exploreMetricsHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func exploreMetricsHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	pattern := args["pattern"]
 	showExamples := args["show_examples"]
@@ -168,11 +167,10 @@ Provide a comprehensive guide to available metrics and their usage.`, pattern, t
 
 	return &mcp.GetPromptResult{
 		Description: "Metrics exploration guide",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},

@@ -2,6 +2,20 @@
 
 Release Notes.
 
+## 0.3.0
+
+### Features
+
+* Migrated to the official `modelcontextprotocol/go-sdk`, adding support for MCP protocol version `2026-07-28`. Clients on earlier revisions keep working: the server answers both the per-request `_meta` model and the legacy `initialize` handshake on the same endpoint.
+* Tool input schemas are now inferred from their Go request types instead of being declared separately, so a schema can no longer drift from the struct it describes.
+
+### Changes
+
+* Removed the MQE documentation resources. The static documents were rarely read by clients, and `mqe://metrics/available` duplicated the `list_mqe_metrics` tool.
+* `--log-command` now records the JSON-RPC message log provided by the SDK; its output format differs from previous releases. Sensitive-field redaction is preserved.
+* Required tool parameters are now enforced: a call missing a required argument (for example `list_instances` without `start`) returns a validation error instead of silently falling back to a default time window.
+* Requires Go 1.26 to build.
+
 ## 0.2.0
 
 ### Features

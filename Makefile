@@ -60,7 +60,7 @@ test-cover: ## Run unit tests with coverage output in coverage.txt.
 	go test $(GO_TEST_FLAGS) -coverprofile=coverage.txt $(GO_TEST_PKGS)
 
 $(GO_LINT):
-	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0
+	@$(GO_LINT) version > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 $(LICENSE_EYE):
 	@$(LICENSE_EYE) --version > /dev/null 2>&1 || go install github.com/apache/skywalking-eyes/cmd/license-eye@latest
 

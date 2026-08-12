@@ -18,34 +18,35 @@
 package prompts
 
 import (
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+const descAnalysisWindowEnd = `End of the analysis window. Examples: "now", "2024-01-01 13:00:00". Default: now`
+
 // AddSkyWalkingPrompts registers all SkyWalking-related prompts
-func AddSkyWalkingPrompts(s *server.MCPServer) {
+func AddSkyWalkingPrompts(s *mcp.Server) {
 	addCoreAnalysisPrompts(s)
 	addTraceAnalysisPrompts(s)
 	addUtilityPrompts(s)
 }
 
-func addCoreAnalysisPrompts(s *server.MCPServer) {
+func addCoreAnalysisPrompts(s *mcp.Server) {
 	// Performance Analysis Prompt
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "analyze-performance",
 		Description: "Analyze service performance using metrics tools",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "service_name", Description: "The name of the service to analyze", Required: true},
 			{Name: "start", Description: `Start of the analysis window. Examples: "-1h", "-30m", "2024-01-01 12:00:00". Default: -1h`, Required: false},
-			{Name: "end", Description: `End of the analysis window. Examples: "now", "2024-01-01 13:00:00". Default: now`, Required: false},
+			{Name: "end", Description: descAnalysisWindowEnd, Required: false},
 		},
 	}, performanceAnalysisHandler)
 
 	// Service Comparison Prompt
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "compare-services",
 		Description: "Compare performance metrics between multiple services",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "services", Description: "Comma-separated list of service names to compare", Required: true},
 			{Name: "metrics", Description: "Metrics to compare (response_time, sla, cpm, all)", Required: false},
 			{Name: "start", Description: `Start of the comparison window. Examples: "-1h", "-2h", "-1d". Default: -1h`, Required: false},
@@ -54,10 +55,10 @@ func addCoreAnalysisPrompts(s *server.MCPServer) {
 	}, compareServicesHandler)
 
 	// Top N Metrics Analysis
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "top-services",
 		Description: "Find top N services by various metrics",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "metric_name", Description: "Metric to rank by (service_cpm, service_resp_time, service_sla)", Required: true},
 			{Name: "top_n", Description: "Number of top services to return (default: 10)", Required: false},
 			{Name: "order", Description: "Order direction (ASC, DES)", Required: false},
@@ -65,12 +66,12 @@ func addCoreAnalysisPrompts(s *server.MCPServer) {
 	}, topServicesHandler)
 }
 
-func addTraceAnalysisPrompts(s *server.MCPServer) {
+func addTraceAnalysisPrompts(s *mcp.Server) {
 	// Trace Investigation Prompt
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "investigate-traces",
 		Description: "Investigate traces for errors and performance issues",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "service_id", Description: "The service to investigate", Required: false},
 			{Name: "trace_state", Description: "Filter by trace state (success, error, all)", Required: false},
 			{Name: "start", Description: `Start of the search window. Examples: "-1h" (last hour), "-30m" (last 30 minutes). Default: -1h`, Required: false},
@@ -79,34 +80,34 @@ func addTraceAnalysisPrompts(s *server.MCPServer) {
 	}, traceInvestigationHandler)
 
 	// Trace Deep Dive
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "trace-deep-dive",
 		Description: "Deep dive analysis of a specific trace",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "trace_id", Description: "The trace ID to analyze", Required: true},
 			{Name: "view", Description: "Analysis view (full, summary, errors_only)", Required: false},
 		},
 	}, traceDeepDiveHandler)
 
 	// Log Analysis Prompt
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "analyze-logs",
 		Description: "Analyze service logs for errors and patterns",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "service_id", Description: "Service to analyze logs", Required: false},
 			{Name: "log_level", Description: "Log level to filter (ERROR, WARN, INFO)", Required: false},
 			{Name: "start", Description: `Start of the analysis window. Examples: "-1h" (last hour), "-6h" (last 6 hours). Default: -1h`, Required: false},
-			{Name: "end", Description: `End of the analysis window. Examples: "now", "2024-01-01 13:00:00". Default: now`, Required: false},
+			{Name: "end", Description: descAnalysisWindowEnd, Required: false},
 		},
 	}, logAnalysisHandler)
 }
 
-func addUtilityPrompts(s *server.MCPServer) {
+func addUtilityPrompts(s *mcp.Server) {
 	// Service Topology Explorer
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "explore-service-topology",
 		Description: "Explore the service topology of a layer: list services, instances, endpoints, and processes within a time range",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "layer", Description: "The layer to explore (e.g. GENERAL, MESH, K8S). Use list_layers if unknown.", Required: true},
 			{Name: "start", Description: `Start time for the query. Examples: "2024-01-01 12:00:00", "-1h" (1 hour ago).`, Required: true},
 			{Name: "end", Description: `End time for the query. Examples: "2024-01-01 13:00:00", "now".` +
@@ -115,11 +116,11 @@ func addUtilityPrompts(s *server.MCPServer) {
 	}, exploreServiceTopologyHandler)
 
 	// Generate Duration Prompt
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name: "generate_duration",
 		Description: "Convert a natural-language time range into a {start, end} duration object" +
 			" for use with list_instances, list_endpoints, list_processes, and similar tools",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "time_range", Description: `Natural-language description of the desired time range.` +
 				` Examples: "last hour", "past 30 minutes", "yesterday 9am to 5pm", "2024-01-01 12:00 to 13:00"`,
 				Required: true},
@@ -127,10 +128,10 @@ func addUtilityPrompts(s *server.MCPServer) {
 	}, generateDurationHandler)
 
 	// MQE Query Builder Prompt
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "build-mqe-query",
 		Description: "Help build MQE (Metrics Query Expression) for complex queries",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "query_type", Description: "Type of query (performance, comparison, trend, alert)", Required: true},
 			{Name: "metrics", Description: "Comma-separated list of metrics to query", Required: true},
 			{Name: "conditions", Description: "Additional conditions or filters", Required: false},
@@ -138,10 +139,10 @@ func addUtilityPrompts(s *server.MCPServer) {
 	}, mqeQueryBuilderHandler)
 
 	// MQE Metrics Explorer
-	s.AddPrompt(mcp.Prompt{
+	s.AddPrompt(&mcp.Prompt{
 		Name:        "explore-metrics",
 		Description: "Explore available metrics and their types",
-		Arguments: []mcp.PromptArgument{
+		Arguments: []*mcp.PromptArgument{
 			{Name: "pattern", Description: "Regex pattern to filter metrics", Required: false},
 			{Name: "show_examples", Description: "Show usage examples for each metric (true/false)", Required: false},
 		},

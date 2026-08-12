@@ -28,7 +28,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -80,29 +80,27 @@ func runSSEServer(ctx context.Context, cfg *config.SSEServerConfig) error {
 
 	allowedOrigins := parseAllowedOrigins(viper.GetString("allowed-origins"))
 
-	// sseServer is assigned after NewSSEServer so the CORS handler closure
-	// can forward to it via the captured pointer variable.
-	var sseServerRef *server.SSEServer
-	customSrv := &http.Server{
-		Handler: corsMiddleware(allowedOrigins, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			sseServerRef.ServeHTTP(w, r)
-		})),
+	// The HTTP+SSE transport predates streamable HTTP and is kept for clients
+	// that still speak it.
+	srv := newMCPServer()
+	handler := mcp.NewSSEHandler(func(*http.Request) *mcp.Server { return srv }, nil)
+
+	basePath := normalizeHTTPPath(cfg.BasePath)
+	ssePath := basePath + "/sse"
+	mux := http.NewServeMux()
+	mux.Handle(basePath+"/", corsMiddleware(allowedOrigins, handler))
+
+	sseServer := &http.Server{
+		Addr:              cfg.Address,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	sseServer := server.NewSSEServer(
-		newMCPServer(),
-		server.WithStaticBasePath(cfg.BasePath),
-		server.WithSSEContextFunc(EnhanceSSEContextFunc()),
-		server.WithHTTPServer(customSrv),
-	)
-	sseServerRef = sseServer
-	ssePath := sseServer.CompleteSsePath()
 	log.Printf("Starting SkyWalking MCP server using SSE transport listening on http://%s%s\n ", cfg.Address, ssePath)
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err := sseServer.Start(cfg.Address); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := sseServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err // bubble up real crashes
 		}
 	}()
@@ -120,23 +118,17 @@ func runSSEServer(ctx context.Context, cfg *config.SSEServerConfig) error {
 		return fmt.Errorf("sse server error: %w", err)
 	}
 
-	// Graceful shutdown
+	// Graceful shutdown. SSE streams never become idle, so Shutdown alone
+	// would wait out its full deadline whenever a client is still connected;
+	// force-close whatever outlives it.
 	shCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// First try to shut down the SSE server
 	if err := sseServer.Shutdown(shCtx); err != nil {
 		if !errors.Is(err, http.ErrServerClosed) {
-			logger.Errorf("Error shutting down SSE server: %v", err)
+			logger.Infof("closing remaining SSE connections: %v", err)
+			_ = sseServer.Close()
 		}
-	}
-
-	// Wait for any remaining operations to complete
-	select {
-	case <-shCtx.Done():
-		return fmt.Errorf("shutdown timed out")
-	case <-time.After(100 * time.Millisecond):
-		// Give a small grace period for cleanup
 	}
 
 	_, _ = fmt.Fprintln(os.Stderr, "SSE server stopped gracefully")

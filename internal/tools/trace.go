@@ -25,16 +25,15 @@ import (
 	"sort"
 
 	"github.com/machinebox/graphql"
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	api "skywalking.apache.org/repo/goapi/query"
 
 	"github.com/apache/skywalking-cli/pkg/graphql/client"
 )
 
 // AddTraceTools registers trace-related tools with the MCP server
-func AddTraceTools(mcp *server.MCPServer) {
-	TracesQueryTool.Register(mcp)
+func AddTraceTools(s *mcp.Server) {
+	mcp.AddTool(s, tracesQueryTool(), searchTraces)
 }
 
 // View constants
@@ -477,9 +476,9 @@ func buildQueryCondition(req *TracesQueryRequest, timeCtx TimeContext) (*api.Tra
 }
 
 // searchTraces fetches traces based on query conditions
-func searchTraces(ctx context.Context, req *TracesQueryRequest) (*mcp.CallToolResult, error) {
-	if err := validateTracesQueryRequest(req); err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+func searchTraces(ctx context.Context, _ *mcp.CallToolRequest, req TracesQueryRequest) (*mcp.CallToolResult, any, error) {
+	if err := validateTracesQueryRequest(&req); err != nil {
+		return ResultError(err.Error()), nil, nil
 	}
 
 	// Set default view
@@ -489,9 +488,9 @@ func searchTraces(ctx context.Context, req *TracesQueryRequest) (*mcp.CallToolRe
 
 	// Build query condition
 	timeCtx := GetTimeContext(ctx)
-	condition, err := buildQueryCondition(req, timeCtx)
+	condition, err := buildQueryCondition(&req, timeCtx)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return ResultError(err.Error()), nil, nil
 	}
 
 	// Execute the query, automatically selecting the trace protocol supported by
@@ -499,16 +498,16 @@ func searchTraces(ctx context.Context, req *TracesQueryRequest) (*mcp.CallToolRe
 	// queryBasicTraces + queryTrace (v1) for Elasticsearch/JDBC and older OAP.
 	traceList, err := queryTracesAuto(ctx, condition)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(ErrFailedToQueryTraces, err)), nil
+		return ResultError(fmt.Sprintf(ErrFailedToQueryTraces, err)), nil, nil
 	}
 
-	return processTracesResult(&traceList, req.View, req.SlowTraceThreshold)
+	return processTracesResult(&traceList, req.View, req.SlowTraceThreshold), nil, nil
 }
 
 // processTracesResult handles the common logic for processing traces query results
-func processTracesResult(traces *api.TraceList, view string, slowTraceThreshold int64) (*mcp.CallToolResult, error) {
+func processTracesResult(traces *api.TraceList, view string, slowTraceThreshold int64) *mcp.CallToolResult {
 	if traces == nil || len(traces.Traces) == 0 {
-		return mcp.NewToolResultError(ErrNoTracesFound), nil
+		return ResultError(ErrNoTracesFound)
 	}
 
 	var result interface{}
@@ -520,14 +519,14 @@ func processTracesResult(traces *api.TraceList, view string, slowTraceThreshold 
 	case ViewFull:
 		result = traces
 	default:
-		return mcp.NewToolResultError(fmt.Sprintf(ErrInvalidView, view, ViewFull, ViewSummary, ViewErrorsOnly)), nil
+		return ResultError(fmt.Sprintf(ErrInvalidView, view, ViewFull, ViewSummary, ViewErrorsOnly))
 	}
 
 	jsonBytes, err := json.Marshal(result)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(ErrMarshalFailed, err)), nil
+		return ResultError(fmt.Sprintf(ErrMarshalFailed, err))
 	}
-	return mcp.NewToolResultText(string(jsonBytes)), nil
+	return ResultText(string(jsonBytes))
 }
 
 // processTraceItem processes a single TraceV2 item and updates summary statistics
@@ -684,9 +683,46 @@ func filterErrorTraces(traces *api.TraceList) []BasicTraceSummary {
 }
 
 // TracesQueryTool is a tool for querying traces with various conditions
-var TracesQueryTool = NewTool(
-	"query_traces",
-	`This tool queries traces from SkyWalking OAP based on various conditions and provides intelligent data processing for LLM analysis.
+func tracesQueryTool() *mcp.Tool {
+	schema := InferSchema[TracesQueryRequest]()
+	WithEnum(schema, "step", stepEnum...)
+	WithEnum(schema, "trace_state", TraceStateSuccess, TraceStateError, TraceStateAll)
+	WithEnum(schema, "query_order", QueryOrderStartTime, QueryOrderDuration)
+	WithEnum(schema, "view", ViewSummary, ViewErrorsOnly, ViewFull)
+	WithDescriptions(schema, map[string]string{
+		"service_id":          "Service ID to filter traces. Use this to find traces from a specific service.",
+		"service_instance_id": "Service instance ID to filter traces. Use this to find traces from a specific instance.",
+		"trace_id":            "Specific trace ID to search for. Use this when you know the exact trace ID.",
+		"endpoint_id":         "Endpoint ID to filter traces. Use this to find traces for a specific endpoint.",
+		"start":               "Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)",
+		"end": "End time for the query. Examples: \"2023-01-01 13:00:00\", \"now\"," +
+			" \"-10m\" (10 minutes ago) Defaults to current time if omitted.",
+		"step":               "Time step granularity. If not specified, uses adaptive sizing.",
+		"min_trace_duration": "Minimum trace duration in milliseconds. Use this to filter out fast traces.",
+		"max_trace_duration": "Maximum trace duration in milliseconds. Use this to filter out slow traces.",
+		"trace_state": `Filter traces by their state:
+- 'success': Only successful traces
+- 'error': Only traces with errors
+- 'all': All traces (default)`,
+		"query_order": `Sort order for results:
+- 'start_time': Oldest first
+- 'duration': Shortest first`,
+		"view": `Data presentation format:
+- 'full': (Default) Complete raw data for detailed analysis
+- 'summary': Intelligent summary with performance metrics and insights
+- 'errors_only': Focused list of error traces for troubleshooting`,
+		"slow_trace_threshold": "Optional threshold for identifying slow traces in milliseconds. " +
+			"Only when this parameter is set will slow traces be included in the summary. " +
+			"Traces with duration exceeding this threshold will be listed in slow_traces. " +
+			"Examples: 500 (0.5s), 2000 (2s), 5000 (5s)",
+		"tags": `Array of span tags to filter traces. Each tag should have 'key' and 'value' fields.
+Examples: [{"key": "http.method", "value": "POST"}, {"key": "http.status_code", "value": "500"}]`,
+		"cold": "Whether to query from cold-stage storage. Set to true for historical data queries.",
+	})
+
+	return &mcp.Tool{
+		Name: "query_traces",
+		Description: `This tool queries traces from SkyWalking OAP based on various conditions and provides intelligent data processing for LLM analysis.
 
 Workflow:
 1. Use this tool when you need to find traces matching specific criteria
@@ -738,76 +774,7 @@ Examples:
 - {"service_id": "Your_ApplicationName"}: Query with default 1-hour duration
 - {"tags": [{"key": "http.method", "value": "POST"}, {"key": "http.status_code", "value": "500"}], 
 	"start": "-1h", "end": "now"}: Find traces with specific HTTP tags`,
-	searchTraces,
-	mcp.WithTitleAnnotation("Query traces with intelligent analysis"),
-	mcp.WithString("service_id",
-		mcp.Description("Service ID to filter traces. Use this to find traces from a specific service."),
-	),
-	mcp.WithString("service_instance_id",
-		mcp.Description("Service instance ID to filter traces. Use this to find traces from a specific instance."),
-	),
-	mcp.WithString("trace_id",
-		mcp.Description("Specific trace ID to search for. Use this when you know the exact trace ID."),
-	),
-	mcp.WithString("endpoint_id",
-		mcp.Description("Endpoint ID to filter traces. Use this to find traces for a specific endpoint."),
-	),
-	mcp.WithString("start",
-		mcp.Description("Start time for the query. Examples: \"2023-01-01 12:00:00\", \"-1h\" (1 hour ago), \"-30m\" (30 minutes ago)"),
-	),
-	mcp.WithString("end",
-		mcp.Description("End time for the query. Examples: \"2023-01-01 13:00:00\", \"now\","+
-			" \"-10m\" (10 minutes ago) Defaults to current time if omitted."),
-	),
-	mcp.WithString("step",
-		mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
-		mcp.Description("Time step granularity. If not specified, uses adaptive sizing."),
-	),
-	mcp.WithNumber("min_trace_duration",
-		mcp.Description("Minimum trace duration in milliseconds. Use this to filter out fast traces."),
-	),
-	mcp.WithNumber("max_trace_duration",
-		mcp.Description("Maximum trace duration in milliseconds. Use this to filter out slow traces."),
-	),
-	mcp.WithString("trace_state",
-		mcp.Enum(TraceStateSuccess, TraceStateError, TraceStateAll),
-		mcp.Description(`Filter traces by their state:
-- 'success': Only successful traces
-- 'error': Only traces with errors
-- 'all': All traces (default)`),
-	),
-	mcp.WithString("query_order",
-		mcp.Enum(QueryOrderStartTime, QueryOrderDuration),
-		mcp.Description(`Sort order for results:
-- 'start_time': Oldest first
-- 'duration': Shortest first`),
-	),
-	mcp.WithString("view",
-		mcp.Enum(ViewSummary, ViewErrorsOnly, ViewFull),
-		mcp.Description(`Data presentation format:
-- 'full': (Default) Complete raw data for detailed analysis
-- 'summary': Intelligent summary with performance metrics and insights
-- 'errors_only': Focused list of error traces for troubleshooting`),
-	),
-	mcp.WithNumber("slow_trace_threshold",
-		mcp.Description("Optional threshold for identifying slow traces in milliseconds. "+
-			"Only when this parameter is set will slow traces be included in the summary. "+
-			"Traces with duration exceeding this threshold will be listed in slow_traces. "+
-			"Examples: 500 (0.5s), 2000 (2s), 5000 (5s)"),
-	),
-	mcp.WithArray("tags",
-		mcp.Description(`Array of span tags to filter traces. Each tag should have 'key' and 'value' fields.
-Examples: [{"key": "http.method", "value": "POST"}, {"key": "http.status_code", "value": "500"}]`),
-		mcp.Items(map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"key":   map[string]any{"type": "string"},
-				"value": map[string]any{"type": "string"},
-			},
-			"required": []string{"key", "value"},
-		}),
-	),
-	mcp.WithBoolean("cold",
-		mcp.Description("Whether to query from cold-stage storage. Set to true for historical data queries."),
-	),
-)
+		InputSchema: schema,
+		Annotations: &mcp.ToolAnnotations{Title: "Query traces with intelligent analysis", IdempotentHint: true},
+	}
+}

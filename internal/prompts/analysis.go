@@ -21,10 +21,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func performanceAnalysisHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func performanceAnalysisHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	serviceName := args["service_name"]
 	start := args["start"]
@@ -74,11 +74,10 @@ Please provide actionable insights and specific recommendations based on the dat
 
 	return &mcp.GetPromptResult{
 		Description: "Performance analysis using SkyWalking tools",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},
@@ -86,7 +85,7 @@ Please provide actionable insights and specific recommendations based on the dat
 	}, nil
 }
 
-func mqeQueryBuilderHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func mqeQueryBuilderHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	queryType := args["query_type"]
 	metrics := args["metrics"]
@@ -117,11 +116,10 @@ If there are multiple ways to achieve this, please show alternatives with pros a
 
 	return &mcp.GetPromptResult{
 		Description: "MQE query building assistance",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},
@@ -129,7 +127,7 @@ If there are multiple ways to achieve this, please show alternatives with pros a
 	}, nil
 }
 
-func compareServicesHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func compareServicesHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	services := args["services"]
 	metrics := args["metrics"]
@@ -182,11 +180,10 @@ Please present the comparison in a clear, tabular format where possible, and hig
 
 	return &mcp.GetPromptResult{
 		Description: "Service comparison analysis",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},
@@ -194,7 +191,7 @@ Please present the comparison in a clear, tabular format where possible, and hig
 	}, nil
 }
 
-func topServicesHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func topServicesHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	metricName := args["metric_name"]
 	topN := args["top_n"]
@@ -237,11 +234,10 @@ Provide ranked results with specific recommendations.`, metricName, topN, order,
 
 	return &mcp.GetPromptResult{
 		Description: "Top services analysis",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},

@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -67,29 +67,36 @@ func NewStreamable() *cobra.Command {
 func runStreamableServer(cfg *config.StreamableServerConfig) error {
 	allowedOrigins := parseAllowedOrigins(viper.GetString("allowed-origins"))
 
-	// httpServer is assigned after NewStreamableHTTPServer so the CORS handler
-	// closure can forward to it via the captured pointer variable.
-	var httpServerRef *server.StreamableHTTPServer
-	customSrv := &http.Server{
-		Handler: corsMiddleware(allowedOrigins, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			httpServerRef.ServeHTTP(w, r)
-		})),
+	// Stateless is required for protocol version 2026-07-28, which carries
+	// identity and capabilities per request instead of in a session.
+	srv := newMCPServer()
+	handler := mcp.NewStreamableHTTPHandler(
+		func(*http.Request) *mcp.Server { return srv },
+		&mcp.StreamableHTTPOptions{Stateless: true},
+	)
+
+	endpointPath := normalizeHTTPPath(cfg.EndpointPath)
+	if endpointPath == "" {
+		endpointPath = "/"
+	}
+	wrapped := corsMiddleware(allowedOrigins, handler)
+	mux := http.NewServeMux()
+	mux.Handle(endpointPath, wrapped)
+	if endpointPath != "/" {
+		// Accept the trailing-slash form too; the previous server did not
+		// route on the path at all.
+		mux.Handle(endpointPath+"/", wrapped)
+	}
+
+	httpServer := &http.Server{
+		Addr:              cfg.Address,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	httpServer := server.NewStreamableHTTPServer(
-		newMCPServer(),
-		server.WithStateLess(true),
-		server.WithLogger(log.StandardLogger()),
-		server.WithHTTPContextFunc(EnhanceHTTPContextFunc()),
-		server.WithEndpointPath(viper.GetString("endpoint-path")),
-		server.WithStreamableHTTPServer(customSrv),
-	)
-	httpServerRef = httpServer
+	log.Infof("streamable HTTP server listening on %s%s\n", cfg.Address, endpointPath)
 
-	log.Infof("streamable HTTP server listening on %s%s\n", cfg.Address, cfg.EndpointPath)
-
-	if err := httpServer.Start(cfg.Address); err != nil {
+	if err := httpServer.ListenAndServe(); err != nil {
 		return fmt.Errorf("streamable HTTP server error: %v", err)
 	}
 

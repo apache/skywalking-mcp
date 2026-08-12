@@ -18,22 +18,60 @@
 package swmcp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"os"
 	"os/signal"
+	"regexp"
+	"sync"
 	"syscall"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/apache/skywalking-mcp/internal/config"
-	"github.com/apache/skywalking-mcp/internal/tools"
 )
+
+// sensitiveFieldPattern matches JSON fields whose values should be redacted in logs.
+var sensitiveFieldPattern = regexp.MustCompile(`(?i)("(?:authorization|password|token|secret)"\s*:\s*")((?:[^"\\]|\\.)*)(")`) //nolint:lll // regex must be on one line
+
+// redactingWriter masks values of sensitive JSON fields before forwarding to
+// the log writer. Data is buffered per line so the redaction regex always sees
+// a full message and secrets split across writes are never partially logged.
+// It is safe for concurrent use.
+type redactingWriter struct {
+	w   io.Writer
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (r *redactingWriter) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.buf.Write(p)
+	data := r.buf.Bytes()
+	var werr error
+	for werr == nil {
+		idx := bytes.IndexByte(data, '\n')
+		if idx < 0 {
+			break
+		}
+		line := sensitiveFieldPattern.ReplaceAll(data[:idx+1], []byte(`${1}[REDACTED]${3}`))
+		// A failed line is dropped rather than retried: keeping it buffered
+		// would rewrite the lines already logged on the next call.
+		_, werr = r.w.Write(line)
+		data = data[idx+1:]
+	}
+	rest := append([]byte(nil), data...)
+	r.buf.Reset()
+	r.buf.Write(rest)
+	return len(p), werr
+}
 
 func NewStdioServer() *cobra.Command {
 	return &cobra.Command{
@@ -64,28 +102,20 @@ func runStdioServer(ctx context.Context, cfg *config.StdioServerConfig) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	stdioServer := server.NewStdioServer(newMCPServer())
-
 	logger, err := initLogger(cfg.LogFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
-	stdLogger := log.New(logger.Writer(), "swmcp-stdio-server", 0)
-	stdioServer.SetErrorLogger(stdLogger)
-	stdioServer.SetContextFunc(EnhanceStdioContextFunc())
+	var transport mcp.Transport = &mcp.StdioTransport{}
+	if cfg.LogCommands {
+		transport = &mcp.LoggingTransport{Transport: transport, Writer: &redactingWriter{w: logger.Writer()}}
+	}
 
 	// Start listening for messages
 	errC := make(chan error, 1)
 	go func() {
-		in, out := io.Reader(os.Stdin), io.Writer(os.Stdout)
-
-		if cfg.LogCommands {
-			loggedIO := tools.NewIOLogger(in, out, logger)
-			in, out = loggedIO, loggedIO
-		}
-
-		errC <- stdioServer.Listen(ctx, in, out)
+		errC <- newMCPServer().Run(ctx, transport)
 	}()
 
 	_, _ = fmt.Fprintf(os.Stderr, "SkyWalking MCP Server running on stdio\n")

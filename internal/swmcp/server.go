@@ -20,11 +20,10 @@ package swmcp
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -32,18 +31,14 @@ import (
 
 	"github.com/apache/skywalking-mcp/internal/config"
 	"github.com/apache/skywalking-mcp/internal/prompts"
-	"github.com/apache/skywalking-mcp/internal/resources"
 	"github.com/apache/skywalking-mcp/internal/tools"
 )
 
-// newMCPServer creates a new MCP server with all tools, resources, and prompts registered.
-func newMCPServer() *server.MCPServer {
-	s := server.NewMCPServer(
-		"skywalking-mcp", "0.1.0",
-		server.WithResourceCapabilities(true, true),
-		server.WithPromptCapabilities(true),
-		server.WithLogging(),
-	)
+// newMCPServer creates a new MCP server with all tools and prompts registered.
+func newMCPServer() *mcp.Server {
+	s := mcp.NewServer(&mcp.Implementation{Name: "skywalking-mcp", Version: "0.1.0"}, nil)
+	s.AddReceivingMiddleware(skyWalkingContextMiddleware())
+
 	tools.AddTraceTools(s)
 	tools.AddLogTools(s)
 	tools.AddMQETools(s)
@@ -51,9 +46,22 @@ func newMCPServer() *server.MCPServer {
 	tools.AddEventTools(s)
 	tools.AddAlarmTools(s)
 	tools.AddTopologyTools(s)
-	resources.AddMQEResources(s)
 	prompts.AddSkyWalkingPrompts(s)
 	return s
+}
+
+// skyWalkingContextMiddleware injects the configured SkyWalking endpoint and
+// credentials into every incoming request. It replaces the per-transport
+// context funcs, which all resolved the same global configuration and ignored
+// their *http.Request argument.
+func skyWalkingContextMiddleware() mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
+			ctx = withConfiguredAuth(ctx)
+			return next(ctx, method, req)
+		}
+	}
 }
 
 func initLogger(logFilePath string) (*logrus.Logger, error) {
@@ -114,6 +122,18 @@ func validateConfiguredSkyWalkingURL() error {
 	return err
 }
 
+// normalizeHTTPPath applies the same normalization the previous SDK applied to
+// transport path flags: "mcp" and "/mcp/" both become "/mcp"; "" and "/"
+// become "". Without it, a value like "mcp" is a host pattern to ServeMux and
+// "" makes ServeMux panic.
+func normalizeHTTPPath(path string) string {
+	trimmed := strings.Trim(path, "/")
+	if trimmed == "" {
+		return ""
+	}
+	return "/" + trimmed
+}
+
 // resolveEnvVar resolves a value that may contain an environment variable reference
 // in the form ${VAR_NAME}. If the value matches this pattern, it returns the
 // environment variable's value. Otherwise, it returns the raw value as-is.
@@ -143,34 +163,4 @@ func withConfiguredAuth(ctx context.Context) context.Context {
 		ctx = WithSkyWalkingAuth(ctx, username, password)
 	}
 	return ctx
-}
-
-// EnhanceStdioContextFunc returns a StdioContextFunc that enriches the context
-// with SkyWalking settings from the global configuration.
-func EnhanceStdioContextFunc() server.StdioContextFunc {
-	return func(ctx context.Context) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
-		ctx = withConfiguredAuth(ctx)
-		return ctx
-	}
-}
-
-// EnhanceSSEContextFunc returns a SSEContextFunc that enriches the context
-// with SkyWalking settings from the CLI configuration and configured auth.
-func EnhanceSSEContextFunc() server.SSEContextFunc {
-	return func(ctx context.Context, _ *http.Request) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
-		ctx = withConfiguredAuth(ctx)
-		return ctx
-	}
-}
-
-// EnhanceHTTPContextFunc returns a HTTPContextFunc that enriches the context
-// with SkyWalking settings from the CLI configuration and configured auth.
-func EnhanceHTTPContextFunc() server.HTTPContextFunc {
-	return func(ctx context.Context, _ *http.Request) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
-		ctx = withConfiguredAuth(ctx)
-		return ctx
-	}
 }
