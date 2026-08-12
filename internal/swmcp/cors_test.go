@@ -20,6 +20,7 @@ package swmcp
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -75,8 +76,8 @@ func TestCORSEmptyAllowlistReflectsAnyOrigin(t *testing.T) {
 	if got := rr.Header().Get("Access-Control-Allow-Origin"); got != openOrigin {
 		t.Fatalf("ACAO = %q, want reflected origin", got)
 	}
-	if got := rr.Header().Get("Vary"); got != "Origin" {
-		t.Fatalf("Vary = %q, want Origin", got)
+	if got := rr.Header().Get("Vary"); got != "Origin, Access-Control-Request-Headers" {
+		t.Fatalf("Vary = %q, want Origin and Access-Control-Request-Headers", got)
 	}
 }
 
@@ -177,6 +178,34 @@ func TestCORSPreflightEmptyAllowlist(t *testing.T) {
 	}
 	if got := rr.Header().Get("Access-Control-Allow-Origin"); got != openOrigin {
 		t.Fatalf("ACAO = %q, want reflected origin on open-CORS preflight", got)
+	}
+}
+
+// Protocol 2026-07-28 clients send Mcp-Param-* headers derived from tool
+// parameters, so a preflight declaring them must be allowed as-is.
+func TestCORSPreflightReflectsRequestedHeaders(t *testing.T) {
+	sentinel := &sentinelHandler{}
+	handler := corsMiddleware(nil, sentinel)
+
+	req := httptest.NewRequest(http.MethodOptions, "/mcp", http.NoBody)
+	req.Header.Set("Origin", openOrigin)
+	req.Header.Set("Access-Control-Request-Headers", "mcp-method, mcp-name, mcp-param-region")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if got := rr.Header().Get("Access-Control-Allow-Headers"); got != "mcp-method, mcp-name, mcp-param-region" {
+		t.Fatalf("Allow-Headers = %q, want the requested headers reflected", got)
+	}
+}
+
+func TestCORSPreflightDefaultAllowsMCPHeaders(t *testing.T) {
+	rr, _ := corsRequest(http.MethodOptions, openOrigin, nil)
+
+	got := rr.Header().Get("Access-Control-Allow-Headers")
+	for _, header := range []string{"Mcp-Protocol-Version", "Mcp-Method", "Mcp-Name", "Mcp-Session-Id"} {
+		if !strings.Contains(got, header) {
+			t.Fatalf("Allow-Headers = %q, missing %q", got, header)
+		}
 	}
 }
 
