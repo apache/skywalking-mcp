@@ -18,13 +18,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/signal"
-	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -42,16 +38,16 @@ var (
 		Short:   "Apache SkyWalking MCP Server.",
 		Long:    `This is a server that implements the MCP protocol for Apache SkyWalking.`,
 		Version: fmt.Sprintf("Version: %s\nCommit: %s\nBuild Date: %s", version, commit, date),
+		PersistentPreRun: func(*cobra.Command, []string) {
+			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+				Level: parseLogLevel(viper.GetString("log-level")),
+			})))
+		},
 	}
 )
 
 func init() {
-	// Set the environment variable prefix
-	viper.SetEnvPrefix("SW")
-	// Enable environment variable reading
-	viper.AutomaticEnv()
-	// All fields with . or - will be replaced with _ for ENV vars
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+	swmcp.ConfigureEnv(viper.GetViper())
 
 	rootCmd.SetVersionTemplate("{{.Short}}\n{{.Version}}\n")
 
@@ -74,13 +70,6 @@ func init() {
 	_ = viper.BindPFlag("read-only", rootCmd.PersistentFlags().Lookup("read-only"))
 	_ = viper.BindPFlag("log-command", rootCmd.PersistentFlags().Lookup("log-command"))
 	_ = viper.BindPFlag("log-file", rootCmd.PersistentFlags().Lookup("log-file"))
-
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: parseLogLevel(viper.GetString("log-level")),
-	})))
-
-	_, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	// Add subcommands
 	rootCmd.AddCommand(swmcp.NewStdioServer())

@@ -51,11 +51,13 @@ SSE-specific Flags:
       --sse-address string     Host and port for the SSE server (default "localhost:8000")
       --base-path string       Base path for the SSE server
       --allowed-origins string Comma-separated list of allowed CORS origins. Empty reflects any origin (open CORS). Use * to send the wildcard header.
+      --disable-localhost-protection  Disable DNS rebinding protection (see Reverse proxies below)
 
 Streamable-specific Flags:
       --address string         Host and port for the Streamable HTTP server (default "localhost:8000")
       --endpoint-path string   Endpoint path for the Streamable HTTP server (default "/mcp")
       --allowed-origins string Comma-separated list of allowed CORS origins. Empty reflects any origin (open CORS). Use * to send the wildcard header.
+      --disable-localhost-protection  Disable DNS rebinding protection (see Reverse proxies below)
 
 Use "swmcp [command] --help" for more information about a command.
 ```
@@ -86,6 +88,30 @@ Transport URL behavior:
 
 - `stdio`, `sse`, and `streamable` all use the configured `--sw-url` value (or the default `http://localhost:12800/graphql`).
 - `sse` and `streamable` ignore request-level URL override headers.
+
+### Reverse proxies
+
+The HTTP transports reject a request that arrives over a loopback address while
+carrying a non-loopback `Host` header, answering `403 Forbidden: invalid Host
+header`. This is DNS rebinding protection: a malicious page can point its own
+hostname at `127.0.0.1` to reach a server running on the visitor's machine, and
+such a request is indistinguishable from a legitimate one except for that `Host`.
+
+A same-host reverse proxy that forwards to `127.0.0.1` while preserving the
+public `Host` produces the same shape and is rejected too. Prefer having the
+proxy rewrite `Host` to localhost, or point it at a non-loopback address.
+
+When you do opt out, pair it with `--allowed-origins`. A browser on the proxy
+host reaches `127.0.0.1` just as the proxy does, so the origin allowlist is the
+only defense left:
+
+```bash
+bin/swmcp streamable --sw-url http://localhost:12800 \
+  --disable-localhost-protection --allowed-origins https://mcp.example.com
+```
+
+Disabling the protection while leaving CORS open (the default) lets any web page
+drive the server through the browser of anyone on that host.
 
 ### Usage with Cursor, Copilot, Claude Code
 

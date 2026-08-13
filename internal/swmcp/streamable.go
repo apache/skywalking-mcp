@@ -25,61 +25,77 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/apache/skywalking-mcp/internal/config"
 )
 
 func NewStreamable() *cobra.Command {
+	cmd, _ := newStreamableCommand()
+	return cmd
+}
+
+// newStreamableCommand also returns the accessor for the configuration the
+// command runs with, so callers observe exactly what RunE consumes.
+func newStreamableCommand() (cmd *cobra.Command, cfg func() config.StreamableServerConfig) {
 	streamableCmd := &cobra.Command{
 		Use:   "streamable",
 		Short: "Start Streamable server",
 		Long:  `Starting SkyWalking MCP server with Streamable HTTP transport.`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			if err := validateConfiguredSkyWalkingURL(); err != nil {
-				return err
-			}
-
-			streamableConfig := config.StreamableServerConfig{
-				Address:      viper.GetString("address"),
-				EndpointPath: viper.GetString("endpoint-path"),
-			}
-
-			return runStreamableServer(&streamableConfig)
-		},
 	}
 
 	// Add Streamable server specific flags
+	v := bindHTTPTransportFlags(streamableCmd)
 	streamableCmd.Flags().String("address", "localhost:8000",
 		"The host and port to start the Streamable server on")
 	streamableCmd.Flags().String("endpoint-path", "/mcp",
 		"The path for the streamable-http server")
-	streamableCmd.Flags().String("allowed-origins", "",
-		"Comma-separated allowed CORS origins. Empty = open (any origin reflected). Use * for wildcard header.")
-	_ = viper.BindPFlag("address", streamableCmd.Flags().Lookup("address"))
-	_ = viper.BindPFlag("endpoint-path", streamableCmd.Flags().Lookup("endpoint-path"))
-	_ = viper.BindPFlag("allowed-origins", streamableCmd.Flags().Lookup("allowed-origins"))
+	_ = v.BindPFlag("address", streamableCmd.Flags().Lookup("address"))
+	_ = v.BindPFlag("endpoint-path", streamableCmd.Flags().Lookup("endpoint-path"))
 
-	return streamableCmd
+	streamableConfig := func() config.StreamableServerConfig {
+		return config.StreamableServerConfig{
+			Address:             v.GetString("address"),
+			EndpointPath:        v.GetString("endpoint-path"),
+			HTTPTransportConfig: httpTransportConfigFrom(v),
+		}
+	}
+
+	streamableCmd.RunE = func(_ *cobra.Command, _ []string) error {
+		if err := validateConfiguredSkyWalkingURL(); err != nil {
+			return err
+		}
+
+		cfg := streamableConfig()
+
+		return runStreamableServer(&cfg)
+	}
+
+	return streamableCmd, streamableConfig
 }
 
-// runStreamableServer starts the Streamable server with the provided configuration.
-func runStreamableServer(cfg *config.StreamableServerConfig) error {
-	allowedOrigins := parseAllowedOrigins(viper.GetString("allowed-origins"))
-
+// newStreamableHandler builds the streamable HTTP handler for cfg.
+func newStreamableHandler(cfg *config.StreamableServerConfig) http.Handler {
 	// Stateless is required for protocol version 2026-07-28, which carries
 	// identity and capabilities per request instead of in a session.
 	srv := newMCPServer()
-	handler := mcp.NewStreamableHTTPHandler(
+	return mcp.NewStreamableHTTPHandler(
 		func(*http.Request) *mcp.Server { return srv },
-		&mcp.StreamableHTTPOptions{Stateless: true},
+		&mcp.StreamableHTTPOptions{
+			Stateless:                  true,
+			DisableLocalhostProtection: cfg.DisableLocalhostProtection,
+		},
 	)
+}
 
+// newStreamableMux wires the served handler: the MCP handler, the CORS and
+// origin check around it, and the endpoint routes.
+func newStreamableMux(cfg *config.StreamableServerConfig) (handler http.Handler, endpoint string) {
 	endpointPath := normalizeHTTPPath(cfg.EndpointPath)
 	if endpointPath == "" {
 		endpointPath = "/"
 	}
-	wrapped := corsMiddleware(allowedOrigins, handler)
+
+	wrapped := corsMiddleware(cfg.AllowedOrigins, newStreamableHandler(cfg))
 	mux := http.NewServeMux()
 	mux.Handle(endpointPath, wrapped)
 	if endpointPath != "/" {
@@ -87,6 +103,13 @@ func runStreamableServer(cfg *config.StreamableServerConfig) error {
 		// route on the path at all.
 		mux.Handle(endpointPath+"/", wrapped)
 	}
+
+	return mux, endpointPath
+}
+
+// runStreamableServer starts the Streamable server with the provided configuration.
+func runStreamableServer(cfg *config.StreamableServerConfig) error {
+	mux, endpointPath := newStreamableMux(cfg)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Address,

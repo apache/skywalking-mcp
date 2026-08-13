@@ -14,6 +14,8 @@ Release Notes.
 * Removed the MQE documentation resources. The static documents were rarely read by clients, and `mqe://metrics/available` duplicated the `list_mqe_metrics` tool.
 * `--log-command` now records the JSON-RPC message log provided by the SDK; its output format differs from previous releases. Sensitive-field redaction is preserved.
 * Required tool parameters are now enforced: a call missing a required argument (for example `list_instances` without `start`) returns a validation error instead of silently falling back to a default time window.
+* The HTTP transports now reject loopback requests carrying a non-loopback `Host`, as DNS rebinding protection; a reverse proxy that preserves the public `Host` needs the new `--disable-localhost-protection`.
+* Fixed `--allowed-origins` being ignored by the `sse` transport.
 * Requires Go 1.26 to build.
 
 ## 0.2.0

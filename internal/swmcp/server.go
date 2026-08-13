@@ -25,6 +25,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
@@ -120,6 +121,50 @@ func resolvedConfiguredSkyWalkingURL() (string, error) {
 func validateConfiguredSkyWalkingURL() error {
 	_, err := resolvedConfiguredSkyWalkingURL()
 	return err
+}
+
+// disableLocalhostProtectionUsage documents the flag shared by the HTTP
+// transports. The SDK rejects a loopback request whose Host header is not a
+// loopback name, which a same-host reverse proxy preserving the public Host
+// looks exactly like.
+const disableLocalhostProtectionUsage = "Disable DNS rebinding protection, which rejects loopback requests " +
+	"carrying a non-localhost Host header. Enable only behind a trusted reverse proxy that preserves the public Host."
+
+const allowedOriginsUsage = "Comma-separated allowed CORS origins. " +
+	"Empty = open (any origin reflected). Use * for wildcard header."
+
+// ConfigureEnv applies the environment variable conventions shared by the root
+// command's viper and the per-transport ones.
+func ConfigureEnv(v *viper.Viper) {
+	v.SetEnvPrefix("SW")
+	v.AutomaticEnv()
+	// All fields with . or - will be replaced with _ for ENV vars
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+}
+
+// bindHTTPTransportFlags registers the flags every HTTP transport accepts and
+// binds them to a viper private to that subcommand. The transports share flag
+// names, and viper keeps a single pflag binding per key, so binding them on the
+// global viper lets the subcommand registered last own every transport's
+// values.
+func bindHTTPTransportFlags(cmd *cobra.Command) *viper.Viper {
+	v := viper.New()
+	ConfigureEnv(v)
+
+	cmd.Flags().String("allowed-origins", "", allowedOriginsUsage)
+	cmd.Flags().Bool("disable-localhost-protection", false, disableLocalhostProtectionUsage)
+	_ = v.BindPFlag("allowed-origins", cmd.Flags().Lookup("allowed-origins"))
+	_ = v.BindPFlag("disable-localhost-protection", cmd.Flags().Lookup("disable-localhost-protection"))
+
+	return v
+}
+
+// httpTransportConfigFrom reads the shared HTTP transport settings.
+func httpTransportConfigFrom(v *viper.Viper) config.HTTPTransportConfig {
+	return config.HTTPTransportConfig{
+		AllowedOrigins:             parseAllowedOrigins(v.GetString("allowed-origins")),
+		DisableLocalhostProtection: v.GetBool("disable-localhost-protection"),
+	}
 }
 
 // normalizeHTTPPath applies the same normalization the previous SDK applied to
