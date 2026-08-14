@@ -24,7 +24,8 @@ import (
 	"testing"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestValidateMQEExpressionRequestRejectsDeeplyNestedExpression(t *testing.T) {
@@ -52,13 +53,37 @@ func TestValidateMetricNameRejectsInvalidCharacters(t *testing.T) {
 	}
 }
 
+func TestMQEExpressionToolSchema(t *testing.T) {
+	schema, ok := mqeExpressionTool().InputSchema.(*jsonschema.Schema)
+	if !ok {
+		t.Fatalf("input schema type = %T", mqeExpressionTool().InputSchema)
+	}
+
+	for _, property := range []string{"expression", "service_name", "debug"} {
+		prop, found := schema.Properties[property]
+		if !found {
+			t.Fatalf("property %q missing", property)
+		}
+		if prop.Description == "" {
+			t.Fatalf("property %q description is empty", property)
+		}
+	}
+
+	if got := schema.Required; len(got) != 1 || got[0] != "expression" {
+		t.Fatalf("required = %v, want [expression]", got)
+	}
+	if got := len(schema.Properties["step"].Enum); got != 5 {
+		t.Fatalf("step enum count = %d, want 5", got)
+	}
+}
+
 func TestExecuteMQEExpressionRejectsOverlongEntityField(t *testing.T) {
 	req := &MQEExpressionRequest{
 		Expression:  "service_cpm",
 		ServiceName: strings.Repeat("a", maxMQEEntityFieldLen+1),
 	}
 
-	result, err := executeMQEExpression(context.Background(), req)
+	result, _, err := executeMQEExpression(context.Background(), nil, *req)
 	if err != nil {
 		t.Fatalf("executeMQEExpression returned error: %v", err)
 	}
@@ -109,7 +134,7 @@ func assertToolResultContains(t *testing.T, result *mcp.CallToolResult, want str
 	if len(result.Content) == 0 {
 		t.Fatal("tool result had no content")
 	}
-	text, ok := result.Content[0].(mcp.TextContent)
+	text, ok := result.Content[0].(*mcp.TextContent)
 	if !ok {
 		t.Fatalf("unexpected content type: %T", result.Content[0])
 	}

@@ -20,8 +20,48 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	api "skywalking.apache.org/repo/goapi/query"
 )
+
+// The jsonschema struct tag carries only descriptions, so enums are applied to
+// the inferred schema afterwards. Dropping that step fails silently.
+func TestAlarmQueryToolSchema(t *testing.T) {
+	schema, ok := alarmQueryTool().InputSchema.(*jsonschema.Schema)
+	if !ok {
+		t.Fatalf("input schema type = %T", alarmQueryTool().InputSchema)
+	}
+
+	tests := []struct {
+		property  string
+		enumCount int
+	}{
+		{property: "scope", enumCount: 9},
+		{property: "step", enumCount: 4},
+		{property: "keyword", enumCount: 0},
+		{property: "page_num", enumCount: 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.property, func(t *testing.T) {
+			property, ok := schema.Properties[tc.property]
+			if !ok {
+				t.Fatalf("property %q missing", tc.property)
+			}
+			if len(property.Enum) != tc.enumCount {
+				t.Fatalf("property %q enum count = %d, want %d", tc.property, len(property.Enum), tc.enumCount)
+			}
+			if property.Description == "" {
+				t.Fatalf("property %q description is empty", tc.property)
+			}
+		})
+	}
+
+	// Every field is omitempty, so none of them may be required.
+	if len(schema.Required) != 0 {
+		t.Fatalf("required = %v, want none", schema.Required)
+	}
+}
 
 func TestBuildAlarmQueryCondition(t *testing.T) {
 	timeCtx := TimeContext{

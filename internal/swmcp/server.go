@@ -20,30 +20,26 @@ package swmcp
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
 
 	"github.com/apache/skywalking-mcp/internal/config"
 	"github.com/apache/skywalking-mcp/internal/prompts"
-	"github.com/apache/skywalking-mcp/internal/resources"
 	"github.com/apache/skywalking-mcp/internal/tools"
 )
 
-// newMCPServer creates a new MCP server with all tools, resources, and prompts registered.
-func newMCPServer() *server.MCPServer {
-	s := server.NewMCPServer(
-		"skywalking-mcp", "0.1.0",
-		server.WithResourceCapabilities(true, true),
-		server.WithPromptCapabilities(true),
-		server.WithLogging(),
-	)
+// newMCPServer creates a new MCP server with all tools and prompts registered.
+func newMCPServer() *mcp.Server {
+	s := mcp.NewServer(&mcp.Implementation{Name: "skywalking-mcp", Version: "0.1.0"}, nil)
+	s.AddReceivingMiddleware(skyWalkingContextMiddleware())
+
 	tools.AddTraceTools(s)
 	tools.AddLogTools(s)
 	tools.AddMQETools(s)
@@ -51,9 +47,22 @@ func newMCPServer() *server.MCPServer {
 	tools.AddEventTools(s)
 	tools.AddAlarmTools(s)
 	tools.AddTopologyTools(s)
-	resources.AddMQEResources(s)
 	prompts.AddSkyWalkingPrompts(s)
 	return s
+}
+
+// skyWalkingContextMiddleware injects the configured SkyWalking endpoint and
+// credentials into every incoming request. It replaces the per-transport
+// context funcs, which all resolved the same global configuration and ignored
+// their *http.Request argument.
+func skyWalkingContextMiddleware() mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
+			ctx = withConfiguredAuth(ctx)
+			return next(ctx, method, req)
+		}
+	}
 }
 
 func initLogger(logFilePath string) (*logrus.Logger, error) {
@@ -114,6 +123,62 @@ func validateConfiguredSkyWalkingURL() error {
 	return err
 }
 
+// disableLocalhostProtectionUsage documents the flag shared by the HTTP
+// transports. The SDK rejects a loopback request whose Host header is not a
+// loopback name, which a same-host reverse proxy preserving the public Host
+// looks exactly like.
+const disableLocalhostProtectionUsage = "Disable DNS rebinding protection, which rejects loopback requests " +
+	"carrying a non-localhost Host header. Enable only behind a trusted reverse proxy that preserves the public Host."
+
+const allowedOriginsUsage = "Comma-separated allowed CORS origins. " +
+	"Empty = open (any origin reflected). Use * for wildcard header."
+
+// ConfigureEnv applies the environment variable conventions shared by the root
+// command's viper and the per-transport ones.
+func ConfigureEnv(v *viper.Viper) {
+	v.SetEnvPrefix("SW")
+	v.AutomaticEnv()
+	// All fields with . or - will be replaced with _ for ENV vars
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+}
+
+// bindHTTPTransportFlags registers the flags every HTTP transport accepts and
+// binds them to a viper private to that subcommand. The transports share flag
+// names, and viper keeps a single pflag binding per key, so binding them on the
+// global viper lets the subcommand registered last own every transport's
+// values.
+func bindHTTPTransportFlags(cmd *cobra.Command) *viper.Viper {
+	v := viper.New()
+	ConfigureEnv(v)
+
+	cmd.Flags().String("allowed-origins", "", allowedOriginsUsage)
+	cmd.Flags().Bool("disable-localhost-protection", false, disableLocalhostProtectionUsage)
+	_ = v.BindPFlag("allowed-origins", cmd.Flags().Lookup("allowed-origins"))
+	_ = v.BindPFlag("disable-localhost-protection", cmd.Flags().Lookup("disable-localhost-protection"))
+
+	return v
+}
+
+// httpTransportConfigFrom reads the shared HTTP transport settings.
+func httpTransportConfigFrom(v *viper.Viper) config.HTTPTransportConfig {
+	return config.HTTPTransportConfig{
+		AllowedOrigins:             parseAllowedOrigins(v.GetString("allowed-origins")),
+		DisableLocalhostProtection: v.GetBool("disable-localhost-protection"),
+	}
+}
+
+// normalizeHTTPPath applies the same normalization the previous SDK applied to
+// transport path flags: "mcp" and "/mcp/" both become "/mcp"; "" and "/"
+// become "". Without it, a value like "mcp" is a host pattern to ServeMux and
+// "" makes ServeMux panic.
+func normalizeHTTPPath(path string) string {
+	trimmed := strings.Trim(path, "/")
+	if trimmed == "" {
+		return ""
+	}
+	return "/" + trimmed
+}
+
 // resolveEnvVar resolves a value that may contain an environment variable reference
 // in the form ${VAR_NAME}. If the value matches this pattern, it returns the
 // environment variable's value. Otherwise, it returns the raw value as-is.
@@ -143,34 +208,4 @@ func withConfiguredAuth(ctx context.Context) context.Context {
 		ctx = WithSkyWalkingAuth(ctx, username, password)
 	}
 	return ctx
-}
-
-// EnhanceStdioContextFunc returns a StdioContextFunc that enriches the context
-// with SkyWalking settings from the global configuration.
-func EnhanceStdioContextFunc() server.StdioContextFunc {
-	return func(ctx context.Context) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
-		ctx = withConfiguredAuth(ctx)
-		return ctx
-	}
-}
-
-// EnhanceSSEContextFunc returns a SSEContextFunc that enriches the context
-// with SkyWalking settings from the CLI configuration and configured auth.
-func EnhanceSSEContextFunc() server.SSEContextFunc {
-	return func(ctx context.Context, _ *http.Request) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
-		ctx = withConfiguredAuth(ctx)
-		return ctx
-	}
-}
-
-// EnhanceHTTPContextFunc returns a HTTPContextFunc that enriches the context
-// with SkyWalking settings from the CLI configuration and configured auth.
-func EnhanceHTTPContextFunc() server.HTTPContextFunc {
-	return func(ctx context.Context, _ *http.Request) context.Context {
-		ctx = WithSkyWalkingURLAndInsecure(ctx, configuredSkyWalkingURL(), viper.GetBool("insecure"))
-		ctx = withConfiguredAuth(ctx)
-		return ctx
-	}
 }

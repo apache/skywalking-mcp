@@ -4,7 +4,7 @@ This file provides guidance for AI assistants working with the Apache SkyWalking
 
 ## Project Overview
 
-Apache SkyWalking MCP — an MCP (Model Context Protocol) server that bridges AI agents with Apache SkyWalking OAP via GraphQL. It exposes SkyWalking's observability data (traces, logs, metrics, topology, alarms, events) as MCP tools, prompts, and resources. Binary name: `swmcp`.
+Apache SkyWalking MCP — an MCP (Model Context Protocol) server that bridges AI agents with Apache SkyWalking OAP via GraphQL. It exposes SkyWalking's observability data (traces, logs, metrics, topology, alarms, events) as MCP tools and prompts. Binary name: `swmcp`.
 
 ## Repository Structure
 
@@ -15,8 +15,7 @@ skywalking-mcp/
 │   ├── config/               # Config structs for each transport mode
 │   ├── swmcp/                # MCP server factory + transport adapters (stdio/sse/streamable)
 │   ├── tools/                # MCP tool implementations (16 tools, grouped by domain)
-│   ├── prompts/              # MCP prompt definitions (10 prompts, three groups)
-│   └── resources/            # MCP resources (embedded MQE docs + dynamic metrics)
+│   └── prompts/              # MCP prompt definitions (10 prompts, three groups)
 └── dist/                     # Distribution license files
 ```
 
@@ -49,7 +48,7 @@ Basic auth is configured via `--sw-username` / `--sw-password` flags. The startu
 
 TLS verification is enforced by default. Use `--sw-insecure` to skip verification (development/self-signed certs only).
 
-Each transport injects the OAP URL, insecure flag, and auth into the request context via `WithSkyWalkingURLAndInsecure()` and `WithSkyWalkingAuth()`. Tools extract them downstream using `skywalking-cli`'s `contextkey.BaseURL{}`, `contextkey.Insecure{}`, `contextkey.Username{}`, and `contextkey.Password{}`.
+`skyWalkingContextMiddleware()` injects the OAP URL, insecure flag, and auth into the request context via `WithSkyWalkingURLAndInsecure()` and `WithSkyWalkingAuth()`. It is registered with `AddReceivingMiddleware` and therefore covers every transport. Tools extract the values downstream using `skywalking-cli`'s `contextkey.BaseURL{}`, `contextkey.Insecure{}`, `contextkey.Username{}`, and `contextkey.Password{}`. The middleware deliberately reads only the configuration, never request headers, so a client cannot redirect queries to another OAP.
 
 ### CORS / CSRF (`internal/swmcp/cors.go`)
 
@@ -57,11 +56,17 @@ Each transport injects the OAP URL, insecure flag, and auth into the request con
 
 ### Server Wiring (`internal/swmcp/server.go`)
 
-`newMCPServer()` is the central registration point — it creates the MCP server and calls all `Add*Tools()`, `Add*Resources()`, and `Add*Prompts()` functions. New capabilities must be registered here.
+`newMCPServer()` is the central registration point — it creates the MCP server and calls all `Add*Tools()` and `Add*Prompts()` functions. New capabilities must be registered here.
 
-### Generic Tool Framework (`internal/tools/tools.go`)
+### Tool Schemas (`internal/tools/result.go`)
 
-`Tool[T, R]` is a typed generic wrapper over MCP's untyped interface. `ConvertTool()` bridges typed handlers into MCP by auto-binding JSON arguments to `T` and marshaling `R` back to JSON. If `R` is already `*mcp.CallToolResult`, it passes through directly. All tools are marked idempotent by default.
+Tools are registered with `mcp.AddTool`, which binds JSON arguments to the handler's input struct and infers the input schema from it. `InferSchema[T]()` derives that schema; since the `jsonschema` struct tag can only carry a description, the helpers next to it patch the rest onto the inferred schema:
+
+- `WithRequired` declares required properties explicitly, rather than leaving the contract to depend on `omitempty`
+- `WithEnum` constrains a property to a fixed set of values
+- `WithDescriptions` sets descriptions a struct tag cannot hold (backticks, newlines, or lines over the length limit)
+
+`ResultText` / `ResultError` build tool results. All tools are marked idempotent.
 
 ### Communication with SkyWalking OAP
 
@@ -83,18 +88,15 @@ All MQE tool inputs are validated before use:
 
 ### Adding a New Tool
 1. Create or edit a file in `internal/tools/` (group by domain, e.g. `event.go`)
-2. Define request struct with `json` tags, write handler using `NewTool()`, create `Add*Tools()` function
-3. Register in `newMCPServer()` in `server.go`
-4. Follow existing tools (e.g. `event.go`) as reference for the pattern
+2. Define the request struct with `json` tags (use `omitempty`) and `jsonschema` tags for descriptions
+3. Write the handler with the `mcp.ToolHandlerFor` signature, plus a `xxxTool()` function returning the `*mcp.Tool`
+4. Register it with `mcp.AddTool` in the domain's `Add*Tools()` function
+5. Register that function in `newMCPServer()` in `server.go`
+6. Follow existing tools (e.g. `event.go`) as reference for the pattern
 
 ### Adding a New Prompt
 1. Add handler in `internal/prompts/` (analysis, trace, or utility group)
 2. Register via `s.AddPrompt()` in the corresponding group function in `registry.go`
-
-### Adding a New Resource
-1. For static content: embed files with `//go:embed` in `internal/resources/`
-2. For dynamic content: call internal tool functions in the resource handler
-3. Register via `s.AddResource()` in `AddMQEResources()` or a new registration function
 
 ## Code Conventions
 
@@ -110,14 +112,14 @@ All `.go` files must have the Apache 2.0 license header (17-line block). Run `ma
 - 22 linters enabled including gosec, errcheck, dupl, gocritic
 
 ### Error Handling in Tools
-Tool handlers should return `(mcp.NewToolResultError(...), nil)` for expected query failures (bad input, OAP errors), not `(nil, err)`. Reserve Go errors for truly unexpected failures. Use the `ErrMarshalFailed` constant for JSON marshal errors.
+Tool handlers should return `(ResultError(...), nil, nil)` for expected query failures (bad input, OAP errors), not a Go error. Reserve Go errors for truly unexpected failures. Use the `ErrMarshalFailed` constant for JSON marshal errors.
 
 ### Comments
 Add a comment only when the code is not clear on its own — explain the non-obvious *why* (a workaround, a compatibility constraint, a surprising side effect), not the *what*. Do not write doc comments that merely restate a function/const name. Example worth keeping: `queryTraceV1GQL` omits the `duration` arg because it does not exist on OAP < 10.3.0.
 
 ## CI & Merge Policy
 
-Squash-merge only. PRs to `main` require 1 approval and passing `Required` status check (license + lint + docker build). Go 1.25.
+Squash-merge only. PRs to `main` require 1 approval and passing `Required` status check (license + lint + docker build). Go 1.26.
 
 ### GitHub Actions & the ASF allowed-actions list
 This repo is under `apache/*` and is governed by the ASF org-wide allowed-actions policy, enforced on every workflow run:

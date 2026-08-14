@@ -28,44 +28,74 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/apache/skywalking-mcp/internal/config"
 )
 
 func NewSSEServer() *cobra.Command {
+	cmd, _ := newSSECommand()
+	return cmd
+}
+
+// newSSECommand also returns the accessor for the configuration the command
+// runs with, so callers observe exactly what RunE consumes.
+func newSSECommand() (cmd *cobra.Command, cfg func() config.SSEServerConfig) {
 	sseCmd := &cobra.Command{
 		Use:   "sse",
 		Short: "Start SSE server",
 		Long:  `Start a server that listens for Server-Sent Events (SSE) on the specified address.`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			if err := validateConfiguredSkyWalkingURL(); err != nil {
-				return err
-			}
-
-			sseServerConfig := config.SSEServerConfig{
-				Address:  viper.GetString("sse-address"),
-				BasePath: viper.GetString("base-path"),
-			}
-
-			return runSSEServer(context.Background(), &sseServerConfig)
-		},
 	}
 
 	// Add SSE server specific flags
+	v := bindHTTPTransportFlags(sseCmd)
 	sseCmd.Flags().String("sse-address", "localhost:8000",
 		"The host and port to start the sse server on")
 	sseCmd.Flags().String("base-path", "",
 		"Base path for the sse server")
-	sseCmd.Flags().String("allowed-origins", "",
-		"Comma-separated allowed CORS origins. Empty = open (any origin reflected). Use * for wildcard header.")
-	_ = viper.BindPFlag("sse-address", sseCmd.Flags().Lookup("sse-address"))
-	_ = viper.BindPFlag("base-path", sseCmd.Flags().Lookup("base-path"))
-	_ = viper.BindPFlag("allowed-origins", sseCmd.Flags().Lookup("allowed-origins"))
+	_ = v.BindPFlag("sse-address", sseCmd.Flags().Lookup("sse-address"))
+	_ = v.BindPFlag("base-path", sseCmd.Flags().Lookup("base-path"))
 
-	return sseCmd
+	sseConfig := func() config.SSEServerConfig {
+		return config.SSEServerConfig{
+			Address:             v.GetString("sse-address"),
+			BasePath:            v.GetString("base-path"),
+			HTTPTransportConfig: httpTransportConfigFrom(v),
+		}
+	}
+
+	sseCmd.RunE = func(_ *cobra.Command, _ []string) error {
+		if err := validateConfiguredSkyWalkingURL(); err != nil {
+			return err
+		}
+
+		sseServerConfig := sseConfig()
+
+		return runSSEServer(context.Background(), &sseServerConfig)
+	}
+
+	return sseCmd, sseConfig
+}
+
+// newSSEHandler builds the SSE handler for cfg. The HTTP+SSE transport
+// predates streamable HTTP and is kept for clients that still speak it.
+func newSSEHandler(cfg *config.SSEServerConfig) http.Handler {
+	srv := newMCPServer()
+	return mcp.NewSSEHandler(
+		func(*http.Request) *mcp.Server { return srv },
+		&mcp.SSEOptions{DisableLocalhostProtection: cfg.DisableLocalhostProtection},
+	)
+}
+
+// newSSEMux wires the served handler: the SSE handler, the CORS and origin
+// check around it, and the base path route. It also reports the SSE endpoint.
+func newSSEMux(cfg *config.SSEServerConfig) (handler http.Handler, ssePath string) {
+	basePath := normalizeHTTPPath(cfg.BasePath)
+	mux := http.NewServeMux()
+	mux.Handle(basePath+"/", corsMiddleware(cfg.AllowedOrigins, newSSEHandler(cfg)))
+
+	return mux, basePath + "/sse"
 }
 
 // runSSEServer starts a server that listens for Server-Sent Events (SSE) on the specified address.
@@ -78,31 +108,19 @@ func runSSEServer(ctx context.Context, cfg *config.SSEServerConfig) error {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
-	allowedOrigins := parseAllowedOrigins(viper.GetString("allowed-origins"))
+	mux, ssePath := newSSEMux(cfg)
 
-	// sseServer is assigned after NewSSEServer so the CORS handler closure
-	// can forward to it via the captured pointer variable.
-	var sseServerRef *server.SSEServer
-	customSrv := &http.Server{
-		Handler: corsMiddleware(allowedOrigins, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			sseServerRef.ServeHTTP(w, r)
-		})),
+	sseServer := &http.Server{
+		Addr:              cfg.Address,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	sseServer := server.NewSSEServer(
-		newMCPServer(),
-		server.WithStaticBasePath(cfg.BasePath),
-		server.WithSSEContextFunc(EnhanceSSEContextFunc()),
-		server.WithHTTPServer(customSrv),
-	)
-	sseServerRef = sseServer
-	ssePath := sseServer.CompleteSsePath()
 	log.Printf("Starting SkyWalking MCP server using SSE transport listening on http://%s%s\n ", cfg.Address, ssePath)
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err := sseServer.Start(cfg.Address); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := sseServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err // bubble up real crashes
 		}
 	}()
@@ -120,23 +138,17 @@ func runSSEServer(ctx context.Context, cfg *config.SSEServerConfig) error {
 		return fmt.Errorf("sse server error: %w", err)
 	}
 
-	// Graceful shutdown
+	// Graceful shutdown. SSE streams never become idle, so Shutdown alone
+	// would wait out its full deadline whenever a client is still connected;
+	// force-close whatever outlives it.
 	shCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// First try to shut down the SSE server
 	if err := sseServer.Shutdown(shCtx); err != nil {
 		if !errors.Is(err, http.ErrServerClosed) {
-			logger.Errorf("Error shutting down SSE server: %v", err)
+			logger.Infof("closing remaining SSE connections: %v", err)
+			_ = sseServer.Close()
 		}
-	}
-
-	// Wait for any remaining operations to complete
-	select {
-	case <-shCtx.Done():
-		return fmt.Errorf("shutdown timed out")
-	case <-time.After(100 * time.Millisecond):
-		// Give a small grace period for cleanup
 	}
 
 	_, _ = fmt.Fprintln(os.Stderr, "SSE server stopped gracefully")

@@ -22,34 +22,33 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	api "skywalking.apache.org/repo/goapi/query"
 
 	swevent "github.com/apache/skywalking-cli/pkg/graphql/event"
 )
 
 // AddEventTools registers event-related tools with the MCP server
-func AddEventTools(s *server.MCPServer) {
-	EventQueryTool.Register(s)
+func AddEventTools(s *mcp.Server) {
+	mcp.AddTool(s, eventQueryTool(), queryEvents)
 }
 
 const orderASC = "ASC"
 
 type EventQueryRequest struct {
-	UUID            string `json:"uuid,omitempty"`
-	Service         string `json:"service,omitempty"`
-	ServiceInstance string `json:"service_instance,omitempty"`
-	Endpoint        string `json:"endpoint,omitempty"`
-	Name            string `json:"name,omitempty"`
-	Type            string `json:"type,omitempty"`
-	Layer           string `json:"layer,omitempty"`
-	Start           string `json:"start,omitempty"`
-	End             string `json:"end,omitempty"`
-	Step            string `json:"step,omitempty"`
-	Order           string `json:"order,omitempty"`
-	PageNum         int    `json:"page_num,omitempty"`
-	PageSize        int    `json:"page_size,omitempty"`
+	UUID            string `json:"uuid,omitempty" jsonschema:"Filter by event UUID."`
+	Service         string `json:"service,omitempty" jsonschema:"Service name to filter events."`
+	ServiceInstance string `json:"service_instance,omitempty" jsonschema:"Service instance name to filter events."`
+	Endpoint        string `json:"endpoint,omitempty" jsonschema:"Endpoint name to filter events."`
+	Name            string `json:"name,omitempty" jsonschema:"Event name to filter."`
+	Type            string `json:"type,omitempty" jsonschema:"Event type: Normal or Error."`
+	Layer           string `json:"layer,omitempty" jsonschema:"Layer to filter events."`
+	Start           string `json:"start,omitempty" jsonschema:"Start time for the query."`
+	End             string `json:"end,omitempty" jsonschema:"End time for the query. Default is now."`
+	Step            string `json:"step,omitempty" jsonschema:"Time step granularity. If not specified, uses adaptive step sizing."`
+	Order           string `json:"order,omitempty" jsonschema:"Order events by time: ASC (oldest first) or DES (newest first, default)."`
+	PageNum         int    `json:"page_num,omitempty" jsonschema:"Page number, default 1."`
+	PageSize        int    `json:"page_size,omitempty" jsonschema:"Page size, default 15."`
 }
 
 func buildEventQueryCondition(req *EventQueryRequest, timeCtx TimeContext) *api.EventQueryCondition {
@@ -96,45 +95,38 @@ func buildEventQueryCondition(req *EventQueryRequest, timeCtx TimeContext) *api.
 	return cond
 }
 
-func queryEvents(ctx context.Context, req *EventQueryRequest) (*mcp.CallToolResult, error) {
+func queryEvents(ctx context.Context, _ *mcp.CallToolRequest, req EventQueryRequest) (*mcp.CallToolResult, any, error) {
 	timeCtx := GetTimeContext(ctx)
-	cond := buildEventQueryCondition(req, timeCtx)
+	cond := buildEventQueryCondition(&req, timeCtx)
 
 	events, err := swevent.Events(ctx, cond)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to query events: %v", err)), nil
+		return ResultError(fmt.Sprintf("failed to query events: %v", err)), nil, nil
 	}
 
 	jsonBytes, err := json.Marshal(events)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(ErrMarshalFailed, err)), nil
+		return ResultError(fmt.Sprintf(ErrMarshalFailed, err)), nil, nil
 	}
-	return mcp.NewToolResultText(string(jsonBytes)), nil
+	return ResultText(string(jsonBytes)), nil, nil
 }
 
-var EventQueryTool = NewTool(
-	"query_events",
-	`Query events from SkyWalking OAP. Events record changes or incidents on a service, instance, or endpoint (e.g. deployments, restarts, scaling).
+func eventQueryTool() *mcp.Tool {
+	schema := InferSchema[EventQueryRequest]()
+	WithEnum(schema, "type", "Normal", "Error")
+	WithEnum(schema, "step", stepEnum...)
+	WithEnum(schema, "order", orderASC, "DES")
+
+	return &mcp.Tool{
+		Name: "query_events",
+		Description: `Query events from SkyWalking OAP.
+Events record changes or incidents on a service, instance, or endpoint (e.g. deployments, restarts, scaling).
 
 Examples:
 - {"service": "Your_ApplicationName", "start": "-1h"}: Recent events for a service
 - {"type": "Error", "start": "-30m"}: Error events in the last 30 minutes
 - {"service": "Your_ApplicationName", "type": "Normal"}: Normal events for a service`,
-	queryEvents,
-	mcp.WithString("uuid", mcp.Description("Filter by event UUID.")),
-	mcp.WithString("service", mcp.Description("Service name to filter events.")),
-	mcp.WithString("service_instance", mcp.Description("Service instance name to filter events.")),
-	mcp.WithString("endpoint", mcp.Description("Endpoint name to filter events.")),
-	mcp.WithString("name", mcp.Description("Event name to filter.")),
-	mcp.WithString("type", mcp.Enum("Normal", "Error"),
-		mcp.Description("Event type: Normal or Error.")),
-	mcp.WithString("layer", mcp.Description("Layer to filter events.")),
-	mcp.WithString("start", mcp.Description("Start time for the query.")),
-	mcp.WithString("end", mcp.Description("End time for the query. Default is now.")),
-	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY"),
-		mcp.Description("Time step granularity. If not specified, uses adaptive step sizing.")),
-	mcp.WithString("order", mcp.Enum(orderASC, "DES"),
-		mcp.Description("Order events by time: ASC (oldest first) or DES (newest first, default).")),
-	mcp.WithNumber("page_num", mcp.Description("Page number, default 1.")),
-	mcp.WithNumber("page_size", mcp.Description("Page size, default 15.")),
-)
+		InputSchema: schema,
+		Annotations: &mcp.ToolAnnotations{Title: "query_events", IdempotentHint: true},
+	}
+}

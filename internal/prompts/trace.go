@@ -21,10 +21,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func traceInvestigationHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func traceInvestigationHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	serviceID := args["service_id"]
 	traceState := args["trace_state"]
@@ -75,11 +75,10 @@ Provide specific findings and actionable recommendations.`, serviceID, traceStat
 
 	return &mcp.GetPromptResult{
 		Description: "Trace investigation using query tools",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},
@@ -87,7 +86,7 @@ Provide specific findings and actionable recommendations.`, serviceID, traceStat
 	}, nil
 }
 
-func logAnalysisHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func logAnalysisHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	serviceID := args["service_id"]
 	logLevel := args["log_level"]
@@ -141,11 +140,10 @@ Provide specific log analysis findings and recommendations.`, serviceID, logLeve
 
 	return &mcp.GetPromptResult{
 		Description: "Log analysis using query_logs tool",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},
@@ -153,7 +151,7 @@ Provide specific log analysis findings and recommendations.`, serviceID, logLeve
 	}, nil
 }
 
-func traceDeepDiveHandler(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func traceDeepDiveHandler(_ context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	args := request.Params.Arguments
 	traceID := args["trace_id"]
 	view := args["view"]
@@ -197,11 +195,10 @@ Provide detailed trace analysis with specific optimization recommendations.`, tr
 
 	return &mcp.GetPromptResult{
 		Description: "Deep dive trace analysis",
-		Messages: []mcp.PromptMessage{
+		Messages: []*mcp.PromptMessage{
 			{
-				Role: mcp.RoleUser,
-				Content: mcp.TextContent{
-					Type: "text",
+				Role: "user",
+				Content: &mcp.TextContent{
 					Text: prompt,
 				},
 			},

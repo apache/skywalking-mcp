@@ -67,6 +67,8 @@ type SSEServerConfig struct {
 
 	// Base path for the sse server
 	BasePath string
+
+	HTTPTransportConfig
 }
 
 type StreamableServerConfig struct {
@@ -88,4 +90,15 @@ type StreamableServerConfig struct {
 
 	// Base path for the Streamable HTTP transport server
 	EndpointPath string
+
+	HTTPTransportConfig
+}
+
+// HTTPTransportConfig holds the settings shared by the HTTP transports.
+type HTTPTransportConfig struct {
+	// Allowed CORS origins, empty reflects any origin
+	AllowedOrigins []string
+
+	// DisableLocalhostProtection turns off DNS rebinding protection
+	DisableLocalhostProtection bool
 }

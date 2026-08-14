@@ -32,17 +32,16 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
 )
 
 // AddMQETools registers MQE-related tools with the MCP server
-func AddMQETools(mcp *server.MCPServer) {
-	MQEExpressionTool.Register(mcp)
-	MQEMetricsListTool.Register(mcp)
-	MQEMetricsTypeTool.Register(mcp)
+func AddMQETools(s *mcp.Server) {
+	mcp.AddTool(s, mqeExpressionTool(), executeMQEExpression)
+	mcp.AddTool(s, mqeMetricsListTool(), listMQEMetrics)
+	mcp.AddTool(s, mqeMetricsTypeTool(), getMQEMetricsType)
 }
 
 const (
@@ -150,7 +149,7 @@ func executeGraphQLWithContext(ctx context.Context, query string, variables map[
 
 // MQEExpressionRequest represents a request to execute MQE expression
 type MQEExpressionRequest struct {
-	Expression              string `json:"expression"`
+	Expression              string `json:"expression,omitempty"`
 	ServiceName             string `json:"service_name,omitempty"`
 	Layer                   string `json:"layer,omitempty"`
 	ServiceInstanceName     string `json:"service_instance_name,omitempty"`
@@ -178,12 +177,12 @@ type MQEMetricsListRequest struct {
 
 // MQEMetricsTypeRequest represents a request to get metric type
 type MQEMetricsTypeRequest struct {
-	MetricName string `json:"metric_name"`
+	MetricName string `json:"metric_name,omitempty"`
 }
 
 // ListServicesRequest represents a request to list services
 type ListServicesRequest struct {
-	Layer string `json:"layer"`
+	Layer string `json:"layer,omitempty" jsonschema:"The layer to list services for. Use list_layers to get available layer names."`
 }
 
 // getServiceInfo queries service information using the specified layer
@@ -330,15 +329,15 @@ func buildMQEEntity(ctx context.Context, req *MQEExpressionRequest) map[string]i
 }
 
 // executeMQEExpression executes MQE expression query
-func executeMQEExpression(ctx context.Context, req *MQEExpressionRequest) (*mcp.CallToolResult, error) {
+func executeMQEExpression(ctx context.Context, _ *mcp.CallToolRequest, req MQEExpressionRequest) (*mcp.CallToolResult, any, error) {
 	if req.Expression == "" {
-		return mcp.NewToolResultError("expression is required"), nil
+		return ResultError("expression is required"), nil, nil
 	}
-	if err := validateMQEExpressionRequest(req); err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+	if err := validateMQEExpressionRequest(&req); err != nil {
+		return ResultError(err.Error()), nil, nil
 	}
 
-	entity := buildMQEEntity(ctx, req)
+	entity := buildMQEEntity(ctx, &req)
 	timeCtx := GetTimeContext(ctx)
 
 	duration := BuildDurationWithContext(req.Start, req.End, req.Step, req.Cold, DefaultDuration, timeCtx)
@@ -404,20 +403,20 @@ func executeMQEExpression(ctx context.Context, req *MQEExpressionRequest) (*mcp.
 
 	result, err := executeGraphQLWithContext(ctx, query, variables)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to execute MQE expression: %v", err)), nil
+		return ResultError(fmt.Sprintf("failed to execute MQE expression: %v", err)), nil, nil
 	}
 
 	jsonBytes, err := json.Marshal(result.Data)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
+		return ResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil, nil
 	}
-	return mcp.NewToolResultText(string(jsonBytes)), nil
+	return ResultText(string(jsonBytes)), nil, nil
 }
 
 // listMQEMetrics lists available metrics
-func listMQEMetrics(ctx context.Context, req *MQEMetricsListRequest) (*mcp.CallToolResult, error) {
-	if err := validateMQEMetricsListRequest(req); err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+func listMQEMetrics(ctx context.Context, _ *mcp.CallToolRequest, req MQEMetricsListRequest) (*mcp.CallToolResult, any, error) {
+	if err := validateMQEMetricsListRequest(&req); err != nil {
+		return ResultError(err.Error()), nil, nil
 	}
 
 	// GraphQL query for listing metrics
@@ -432,48 +431,29 @@ func listMQEMetrics(ctx context.Context, req *MQEMetricsListRequest) (*mcp.CallT
 	`
 
 	variables := map[string]interface{}{}
-	if req != nil && req.Regex != "" {
+	if req.Regex != "" {
 		variables["regex"] = req.Regex
 	}
 
 	result, err := executeGraphQLWithContext(ctx, query, variables)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to list metrics: %v", err)), nil
+		return ResultError(fmt.Sprintf("failed to list metrics: %v", err)), nil, nil
 	}
 
 	jsonBytes, err := json.Marshal(result.Data)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
+		return ResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil, nil
 	}
-	return mcp.NewToolResultText(string(jsonBytes)), nil
-}
-
-// ListMQEMetricsInternal is an exported function for internal use by resources package
-func ListMQEMetricsInternal(ctx context.Context, regex *string) (string, error) {
-	var req *MQEMetricsListRequest
-	if regex != nil {
-		req = &MQEMetricsListRequest{Regex: *regex}
-	}
-	result, err := listMQEMetrics(ctx, req)
-	if err != nil {
-		return "", err
-	}
-
-	// Extract the text content from the tool result
-	if textResult, ok := result.Content[0].(mcp.TextContent); ok {
-		return textResult.Text, nil
-	}
-
-	return "", fmt.Errorf("unexpected result format")
+	return ResultText(string(jsonBytes)), nil, nil
 }
 
 // getMQEMetricsType gets metric type information
-func getMQEMetricsType(ctx context.Context, req *MQEMetricsTypeRequest) (*mcp.CallToolResult, error) {
+func getMQEMetricsType(ctx context.Context, _ *mcp.CallToolRequest, req MQEMetricsTypeRequest) (*mcp.CallToolResult, any, error) {
 	if req.MetricName == "" {
-		return mcp.NewToolResultError("metric_name must be provided"), nil
+		return ResultError("metric_name must be provided"), nil, nil
 	}
 	if err := validateMetricName(req.MetricName); err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return ResultError(err.Error()), nil, nil
 	}
 
 	// GraphQL query for getting metric type
@@ -489,14 +469,14 @@ func getMQEMetricsType(ctx context.Context, req *MQEMetricsTypeRequest) (*mcp.Ca
 
 	result, err := executeGraphQLWithContext(ctx, query, variables)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to get metric type: %v", err)), nil
+		return ResultError(fmt.Sprintf("failed to get metric type: %v", err)), nil, nil
 	}
 
 	jsonBytes, err := json.Marshal(result.Data)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
+		return ResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil, nil
 	}
-	return mcp.NewToolResultText(string(jsonBytes)), nil
+	return ResultText(string(jsonBytes)), nil, nil
 }
 
 func validateMQEExpressionRequest(req *MQEExpressionRequest) error {
@@ -647,9 +627,44 @@ func nestingDepth(value string) int {
 	return maxDepth
 }
 
-var MQEExpressionTool = NewTool(
-	"execute_mqe_expression",
-	`Execute MQE (Metrics Query Expression) to query and calculate metrics data.
+func mqeExpressionTool() *mcp.Tool {
+	schema := InferSchema[MQEExpressionRequest]()
+	WithRequired(schema, "expression")
+	WithEnum(schema, "step", "SECOND", "MINUTE", "HOUR", "DAY", "MONTH")
+	WithDescriptions(schema, map[string]string{
+		"expression": "MQE expression to execute (required). " +
+			"Examples: `service_sla`, `avg(service_cpm)`, `service_sla * 100`, `service_percentile{p='50,75,90,95,99'}`",
+		"service_name": "Service name for entity filtering",
+		"layer": "Service layer for entity filtering. " +
+			"Examples: `GENERAL` (default), `MESH`, `K8S_SERVICE`, `DATABASE`, `VIRTUAL_DATABASE`. " +
+			"Defaults to GENERAL if not specified",
+		"service_instance_name": "Service instance name for entity filtering",
+		"endpoint_name":         "Endpoint name for entity filtering",
+		"process_name":          "Process name for entity filtering",
+		"normal": "Whether the service is normal (has agent installed). " +
+			"If not specified, will be auto-detected based on service layer",
+		"dest_service_name": "Destination service name for relation metrics",
+		"dest_layer": "Destination service layer for relation metrics. " +
+			"Examples: `GENERAL`, `MESH`, `K8S_SERVICE`, `DATABASE`",
+		"dest_service_instance_name": "Destination service instance name for relation metrics",
+		"dest_endpoint_name":         "Destination endpoint name for relation metrics",
+		"dest_process_name":          "Destination process name for relation metrics",
+		"dest_normal":                "Whether the destination service is normal",
+		"start":                      "Start time for the query. Examples: `2025-07-06 12:00:00`, `-1h` (1 hour ago), `-30m` (30 minutes ago)",
+		"end":                        "End time for the query. Examples: `2025-07-06 13:00:00`, `now`, `-10m` (10 minutes ago)",
+		"step": "Time step between start time and end time: " +
+			"SECOND (second-level), MINUTE (minute-level), HOUR (hour-level), " +
+			"DAY (day-level), MONTH (month-level). " +
+			"If not specified, uses adaptive step sizing: " +
+			"SECOND (<1h), MINUTE (1h-24h), HOUR (1d-7d), DAY (>7d)",
+		"cold":        "Whether to query from cold-stage storage",
+		"debug":       "Enable query tracing and debugging",
+		"dump_db_rsp": "Dump database response for debugging",
+	})
+
+	return &mcp.Tool{
+		Name: "execute_mqe_expression",
+		Description: `Execute MQE (Metrics Query Expression) to query and calculate metrics data.
 
 MQE is SkyWalking's powerful query language that allows you to:
 - Query metrics with labels: service_percentile{p='50,75,90,95,99'}
@@ -696,45 +711,20 @@ Examples:
 - {expression: "service_cpm", start: "now", end: "+24h"}: Query CPM for next 24 hours (useful for capacity planning)
 - {expression: "top_n(service_cpm, 10, des)", start: "2025-07-06 16:00:00", end: "2025-07-06 17:00:00", 
 	step: "MINUTE"}: Top 10 services by CPM with minute granularity`,
-	executeMQEExpression,
-	mcp.WithString("expression", mcp.Required(),
-		mcp.Description("MQE expression to execute (required). "+
-			"Examples: `service_sla`, `avg(service_cpm)`, `service_sla * 100`, `service_percentile{p='50,75,90,95,99'}`")),
-	mcp.WithString("service_name", mcp.Description("Service name for entity filtering")),
-	mcp.WithString("layer",
-		mcp.Description("Service layer for entity filtering. "+
-			"Examples: `GENERAL` (default), `MESH`, `K8S_SERVICE`, `DATABASE`, `VIRTUAL_DATABASE`. "+
-			"Defaults to GENERAL if not specified")),
-	mcp.WithString("service_instance_name", mcp.Description("Service instance name for entity filtering")),
-	mcp.WithString("endpoint_name", mcp.Description("Endpoint name for entity filtering")),
-	mcp.WithString("process_name", mcp.Description("Process name for entity filtering")),
-	mcp.WithBoolean("normal",
-		mcp.Description("Whether the service is normal (has agent installed). "+
-			"If not specified, will be auto-detected based on service layer")),
-	mcp.WithString("dest_service_name", mcp.Description("Destination service name for relation metrics")),
-	mcp.WithString("dest_layer",
-		mcp.Description("Destination service layer for relation metrics. "+
-			"Examples: `GENERAL`, `MESH`, `K8S_SERVICE`, `DATABASE`")),
-	mcp.WithString("dest_service_instance_name", mcp.Description("Destination service instance name for relation metrics")),
-	mcp.WithString("dest_endpoint_name", mcp.Description("Destination endpoint name for relation metrics")),
-	mcp.WithString("dest_process_name", mcp.Description("Destination process name for relation metrics")),
-	mcp.WithBoolean("dest_normal", mcp.Description("Whether the destination service is normal")),
-	mcp.WithString("start", mcp.Description("Start time for the query. Examples: `2025-07-06 12:00:00`, `-1h` (1 hour ago), `-30m` (30 minutes ago)")),
-	mcp.WithString("end", mcp.Description("End time for the query. Examples: `2025-07-06 13:00:00`, `now`, `-10m` (10 minutes ago)")),
-	mcp.WithString("step", mcp.Enum("SECOND", "MINUTE", "HOUR", "DAY", "MONTH"),
-		mcp.Description("Time step between start time and end time: "+
-			"SECOND (second-level), MINUTE (minute-level), HOUR (hour-level), "+
-			"DAY (day-level), MONTH (month-level). "+
-			"If not specified, uses adaptive step sizing: "+
-			"SECOND (<1h), MINUTE (1h-24h), HOUR (1d-7d), DAY (>7d)")),
-	mcp.WithBoolean("cold", mcp.Description("Whether to query from cold-stage storage")),
-	mcp.WithBoolean("debug", mcp.Description("Enable query tracing and debugging")),
-	mcp.WithBoolean("dump_db_rsp", mcp.Description("Dump database response for debugging")),
-)
+		InputSchema: schema,
+		Annotations: &mcp.ToolAnnotations{Title: "execute_mqe_expression", IdempotentHint: true},
+	}
+}
 
-var MQEMetricsListTool = NewTool(
-	"list_mqe_metrics",
-	`List available metrics in SkyWalking that can be used in MQE expressions.
+func mqeMetricsListTool() *mcp.Tool {
+	schema := InferSchema[MQEMetricsListRequest]()
+	WithDescriptions(schema, map[string]string{
+		"regex": "Optional regex pattern to filter metrics by name. Examples: `service_.*`, `.*_cpm`, `endpoint_.*`",
+	})
+
+	return &mcp.Tool{
+		Name: "list_mqe_metrics",
+		Description: `List available metrics in SkyWalking that can be used in MQE expressions.
 
 This tool helps you discover what metrics are available for querying and their metadata information 
 including metric type and catalog. You can optionally provide a regex pattern to filter the metrics by name.
@@ -763,13 +753,22 @@ Examples:
 - {regex: ".*_cpm"}: List all CPM (calls per minute) metrics
 - {regex: ".*percentile.*"}: List all percentile metrics
 - {}: List all available metrics`,
-	listMQEMetrics,
-	mcp.WithString("regex", mcp.Description("Optional regex pattern to filter metrics by name. Examples: `service_.*`, `.*_cpm`, `endpoint_.*`")),
-)
+		InputSchema: schema,
+		Annotations: &mcp.ToolAnnotations{Title: "list_mqe_metrics", IdempotentHint: true},
+	}
+}
 
-var MQEMetricsTypeTool = NewTool(
-	"get_mqe_metric_type",
-	`Get type information for a specific metric.
+func mqeMetricsTypeTool() *mcp.Tool {
+	schema := InferSchema[MQEMetricsTypeRequest]()
+	WithRequired(schema, "metric_name")
+	WithDescriptions(schema, map[string]string{
+		"metric_name": "Name of the metric to get type information for (required). " +
+			"Examples: `service_sla`, `service_percentile`, `endpoint_cpm`",
+	})
+
+	return &mcp.Tool{
+		Name: "get_mqe_metric_type",
+		Description: `Get type information for a specific metric.
 
 This tool returns the type and catalog information for a given metric name, which helps understand 
 what kind of data the metric contains and how it should be used in MQE expressions.
@@ -800,8 +799,7 @@ Examples:
 - {metric_name: "service_cpm"}: Get type info for service CPM metric
 - {metric_name: "service_percentile"}: Get type info for service percentile metric
 - {metric_name: "endpoint_sla"}: Get type info for endpoint SLA metric`,
-	getMQEMetricsType,
-	mcp.WithString("metric_name", mcp.Required(),
-		mcp.Description("Name of the metric to get type information for (required). "+
-			"Examples: `service_sla`, `service_percentile`, `endpoint_cpm`")),
-)
+		InputSchema: schema,
+		Annotations: &mcp.ToolAnnotations{Title: "get_mqe_metric_type", IdempotentHint: true},
+	}
+}

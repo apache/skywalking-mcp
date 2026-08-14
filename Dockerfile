@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Build stage
-FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS builder
 
 # Default version
 ARG VERSION="dev"

@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	api "skywalking.apache.org/repo/goapi/query"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
@@ -127,14 +127,11 @@ func TestQueryTracesAutoUsesV1WhenV2Unsupported(t *testing.T) {
 	}
 
 	// The summary is derived from the fetched spans, including the error state.
-	result, err := processTracesResult(&list, ViewSummary, 0)
-	if err != nil {
-		t.Fatalf("processTracesResult returned error: %v", err)
-	}
+	result := processTracesResult(&list, ViewSummary, 0)
 	if result.IsError {
 		t.Fatalf("unexpected tool error: %v", result)
 	}
-	text, ok := result.Content[0].(mcp.TextContent)
+	text, ok := result.Content[0].(*mcp.TextContent)
 	if !ok {
 		t.Fatalf("unexpected content type: %T", result.Content[0])
 	}

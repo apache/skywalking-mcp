@@ -28,6 +28,13 @@ import (
 // When allowedOrigins is non-empty, only listed origins receive CORS headers;
 // requests from any other origin receive 403 Forbidden. Use "*" as an entry
 // to explicitly allow all origins via the wildcard header.
+// defaultAllowedHeaders covers the fixed headers the MCP transports read:
+// Mcp-Protocol-Version, Mcp-Method, and Mcp-Name are required by protocol
+// 2026-07-28; Mcp-Session-Id and Last-Event-ID are sent by clients on
+// earlier protocol revisions.
+const defaultAllowedHeaders = "Content-Type, Authorization, Accept, " +
+	"Mcp-Protocol-Version, Mcp-Method, Mcp-Name, Mcp-Session-Id, Last-Event-ID"
+
 func corsMiddleware(allowedOrigins []string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
@@ -35,8 +42,17 @@ func corsMiddleware(allowedOrigins []string, next http.Handler) http.Handler {
 			if len(allowedOrigins) == 0 || isOriginAllowed(origin, allowedOrigins) {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
-				w.Header().Set("Vary", "Origin")
+				// Protocol 2026-07-28 mirrors tool parameters annotated with
+				// x-mcp-header into dynamic Mcp-Param-* request headers, so the
+				// allowed set cannot be enumerated statically; reflect whatever
+				// the preflight declares. Origin validation above remains the
+				// security gate.
+				if requested := r.Header.Get("Access-Control-Request-Headers"); requested != "" {
+					w.Header().Set("Access-Control-Allow-Headers", requested)
+				} else {
+					w.Header().Set("Access-Control-Allow-Headers", defaultAllowedHeaders)
+				}
+				w.Header().Set("Vary", "Origin, Access-Control-Request-Headers")
 			} else {
 				http.Error(w, "forbidden: origin not allowed", http.StatusForbidden)
 				return

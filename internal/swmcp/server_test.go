@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/apache/skywalking-cli/pkg/contextkey"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -147,14 +148,31 @@ func TestWithConfiguredAuthSkipsEmptyUsername(t *testing.T) {
 	}
 }
 
-func TestEnhanceStdioContextFuncUsesConfiguredURLAndAuth(t *testing.T) {
+// middlewareContext runs the context middleware over req and returns the
+// context it handed downstream. One middleware now serves every transport, so
+// the injection behavior only needs asserting once.
+func middlewareContext(t *testing.T, req mcp.Request) context.Context {
+	t.Helper()
+
+	var got context.Context
+	next := func(ctx context.Context, _ string, _ mcp.Request) (mcp.Result, error) {
+		got = ctx
+		return nil, nil
+	}
+	if _, err := skyWalkingContextMiddleware()(next)(context.Background(), "tools/call", req); err != nil {
+		t.Fatalf("middleware: %v", err)
+	}
+	return got
+}
+
+func TestSkyWalkingContextMiddlewareInjectsURLAndAuth(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	t.Setenv("SW_STDIO_PASS", "stdio-pass")
 	viper.Set("url", "https://configured-oap.example.com")
 	viper.Set("username", "stdio-user")
 	viper.Set("password", "${SW_STDIO_PASS}")
 
-	ctx := EnhanceStdioContextFunc()(context.Background())
+	ctx := middlewareContext(t, nil)
 
 	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
 	if gotURL != configuredHTTPSOAPURL {
@@ -172,38 +190,18 @@ func TestEnhanceStdioContextFuncUsesConfiguredURLAndAuth(t *testing.T) {
 	}
 }
 
-func TestEnhanceHTTPContextFuncDoesNotUseSWURLHeader(t *testing.T) {
+// A client must not be able to redirect queries to another OAP through request
+// headers.
+func TestSkyWalkingContextMiddlewareIgnoresSWURLHeader(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	viper.Set("url", "http://configured-oap:12800")
 
-	req, err := http.NewRequest(http.MethodPost, "http://client/request", http.NoBody)
-	if err != nil {
-		t.Fatalf("create request: %v", err)
+	req := &mcp.CallToolRequest{
+		Extra: &mcp.RequestExtra{Header: http.Header{"SW-URL": {"http://attacker.invalid:8080"}}},
 	}
-	req.Header.Set("SW-URL", "http://attacker.invalid:8080")
 
-	ctx := EnhanceHTTPContextFunc()(context.Background(), req)
-
-	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
+	gotURL, _ := middlewareContext(t, req).Value(contextkey.BaseURL{}).(string)
 	if gotURL != configuredHTTPOAPURL {
-		t.Fatalf("base URL = %q", gotURL)
-	}
-}
-
-func TestEnhanceSSEContextFuncDoesNotUseSWURLHeader(t *testing.T) {
-	t.Cleanup(viper.Reset)
-	viper.Set("url", "https://configured-oap.example.com")
-
-	req, err := http.NewRequest(http.MethodGet, "http://client/events", http.NoBody)
-	if err != nil {
-		t.Fatalf("create request: %v", err)
-	}
-	req.Header.Set("SW-URL", "https://attacker.invalid")
-
-	ctx := EnhanceSSEContextFunc()(context.Background(), req)
-
-	gotURL, _ := ctx.Value(contextkey.BaseURL{}).(string)
-	if gotURL != configuredHTTPSOAPURL {
 		t.Fatalf("base URL = %q", gotURL)
 	}
 }
@@ -211,17 +209,9 @@ func TestEnhanceSSEContextFuncDoesNotUseSWURLHeader(t *testing.T) {
 func TestInsecureFlagDefaultsToFalse(t *testing.T) {
 	t.Cleanup(viper.Reset)
 
-	req, _ := http.NewRequest(http.MethodGet, "http://client/events", http.NoBody)
-
-	for name, ctx := range map[string]context.Context{
-		"stdio":      EnhanceStdioContextFunc()(context.Background()),
-		"sse":        EnhanceSSEContextFunc()(context.Background(), req),
-		"streamable": EnhanceHTTPContextFunc()(context.Background(), req),
-	} {
-		insecure, _ := ctx.Value(contextkey.Insecure{}).(bool)
-		if insecure {
-			t.Errorf("%s: contextkey.Insecure{} should default to false", name)
-		}
+	insecure, _ := middlewareContext(t, nil).Value(contextkey.Insecure{}).(bool)
+	if insecure {
+		t.Error("contextkey.Insecure{} should default to false")
 	}
 }
 
@@ -229,16 +219,8 @@ func TestInsecureFlagPropagatedToContext(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	viper.Set("insecure", true)
 
-	req, _ := http.NewRequest(http.MethodGet, "http://client/events", http.NoBody)
-
-	for name, ctx := range map[string]context.Context{
-		"stdio":      EnhanceStdioContextFunc()(context.Background()),
-		"sse":        EnhanceSSEContextFunc()(context.Background(), req),
-		"streamable": EnhanceHTTPContextFunc()(context.Background(), req),
-	} {
-		insecure, ok := ctx.Value(contextkey.Insecure{}).(bool)
-		if !ok || !insecure {
-			t.Errorf("%s: contextkey.Insecure{} should be true when viper insecure=true", name)
-		}
+	insecure, ok := middlewareContext(t, nil).Value(contextkey.Insecure{}).(bool)
+	if !ok || !insecure {
+		t.Error("contextkey.Insecure{} should be true when viper insecure=true")
 	}
 }
