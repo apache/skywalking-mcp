@@ -16,6 +16,7 @@ Release Notes.
 * Required tool parameters are now enforced: a call missing a required argument (for example `list_instances` without `start`) returns a validation error instead of silently falling back to a default time window.
 * The HTTP transports now reject loopback requests carrying a non-loopback `Host`, as DNS rebinding protection; a reverse proxy that preserves the public `Host` needs the new `--disable-localhost-protection`.
 * Fixed `--allowed-origins` being ignored by the `sse` transport.
+* Bumped `golang.org/x/text` to v0.41.0 and `golang.org/x/sys` to v0.44.0 (pulling in `golang.org/x/sync` v0.22.0) to fix the vulnerabilities reported by `govulncheck`: GO-2026-6629, GO-2026-5970 and GO-2026-5024.
 * Requires Go 1.26 to build.
 
 ## 0.2.0
