@@ -6,7 +6,7 @@ This document describes the full release process for Apache SkyWalking MCP, foll
 
 - Apache committer account with SVN write access to `dist.apache.org`
 - GPG key registered in the [Apache KEYS file](https://dist.apache.org/repos/dist/release/skywalking/KEYS)
-- Tools installed: `git`, `gpg`, `shasum`, `svn`, `make`
+- Tools installed: `git`, `gpg`, `shasum`, `svn`, `make`, and Docker with its daemon running
 
 ### Verify your GPG key is ready
 
@@ -62,9 +62,14 @@ By default, the release commit is resolved from tag `v${VERSION}` when it exists
 This runs three steps in sequence:
 1. `release-source` — creates `build/skywalking-mcp-${VERSION}-src.tgz`
 2. `release-binary` — creates `build/skywalking-mcp-${VERSION}.tgz`
-3. `release-sign` — creates signatures and checksums for both tarballs:
+3. `release-sign` — checks both tarballs, then creates their signatures and checksums:
     - `build/skywalking-mcp-${VERSION}.tgz.asc` and `build/skywalking-mcp-${VERSION}.tgz.sha512`
     - `build/skywalking-mcp-${VERSION}-src.tgz.asc` and `build/skywalking-mcp-${VERSION}-src.tgz.sha512`
+
+Both tarballs are packed with GNU tar in a Linux container (`scripts/linux-tar.sh`), not with the host's `tar`, so a
+release made on macOS carries no macOS metadata (AppleDouble `._*` files or extended-attribute headers). This needs
+Docker running. Before signing, `release-sign` unpacks each tarball with GNU tar in the same image, and stops if
+tar prints any warning or finds a `._*` entry.
 
 ---
 
