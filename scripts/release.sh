@@ -106,6 +106,7 @@ SOURCE_FILE=${BUILDDIR}/${SOURCE_FILE_NAME}
 
 binary(){
     require_cmd tar
+    bash "${SCRIPTDIR}/linux-tar.sh" check
 
     if [ ! -f "${SOURCE_FILE}" ]; then
         echo "Source archive ${SOURCE_FILE} does not exist. Run '${0} -s' first to assemble the source package." >&2
@@ -127,12 +128,14 @@ binary(){
         cp -Rfv ./CHANGES.md "${bindir}"
         cp -Rfv ./README.md "${bindir}"
         cp -Rfv ./dist/* "${bindir}"
-        tar -czf "${BUILDDIR}/skywalking-mcp-${RELEASE_VERSION}.tgz" -C "${bindir}" .
+        bash "${SCRIPTDIR}/linux-tar.sh" pack . -czf "skywalking-mcp-${RELEASE_VERSION}.tgz" -C "${bindir}" .
+        mv "skywalking-mcp-${RELEASE_VERSION}.tgz" "${BUILDDIR}/"
     )
 }
 
 source(){
     require_cmd tar
+    bash "${SCRIPTDIR}/linux-tar.sh" check
     require_git_worktree
     require_cmd git
 
@@ -146,7 +149,7 @@ source(){
         mkdir -p "${srcdir}"
         git -C "${ROOTDIR}" archive --format=tar "${RELEASE_GIT_COMMIT}" | tar -xf - -C "${srcdir}"
         echo "RELEASE_VERSION=${RELEASE_VERSION}" > "${srcdir}/.env"
-        tar -czf "${tmpdir}/${SOURCE_FILE_NAME}" -C "${srcdir}" .
+        bash "${SCRIPTDIR}/linux-tar.sh" pack "${tmpdir}" -czf "${SOURCE_FILE_NAME}" -C src .
 
         mkdir -p "${BUILDDIR}"
         mv "${tmpdir}/${SOURCE_FILE_NAME}" "${BUILDDIR}"
@@ -160,6 +163,7 @@ sign(){
     pushd "${BUILDDIR}" >/dev/null
     trap 'popd >/dev/null' EXIT
 
+    bash "${SCRIPTDIR}/linux-tar.sh" verify "skywalking-mcp-${RELEASE_VERSION}-src.tgz" "skywalking-mcp-${RELEASE_VERSION}.tgz"
     gpg --batch --yes --armor --detach-sig "skywalking-mcp-${RELEASE_VERSION}-src.tgz"
     shasum -a 512 "skywalking-mcp-${RELEASE_VERSION}-src.tgz" > "skywalking-mcp-${RELEASE_VERSION}-src.tgz.sha512"
     gpg --batch --yes --armor --detach-sig "skywalking-mcp-${RELEASE_VERSION}.tgz"
